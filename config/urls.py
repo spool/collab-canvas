@@ -21,6 +21,11 @@ urlpatterns = [
     ),
     path("accounts/", include("allauth.urls")),
     # Your stuff: custom urls includes go here
+    path(
+        "visual_canvas/",
+        TemplateView.as_view(template_name="pages/visual_canvas.html"),
+        name="visual_canvas",
+    ),
 ] + static(
     settings.MEDIA_URL, document_root=settings.MEDIA_ROOT
 )

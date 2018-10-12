@@ -19,13 +19,18 @@ class VisualCanvas(Model):
 
     title = CharField(_("Canvas Title"), max_length=100)
     slug = SlugField(_("URL Compliant Title"), unique=True)
-    description = TextField(max_length=200, blank=True)  # Only enforced in admin interface, not in database
+    description = TextField(max_length=200, blank=True)  # Only enforced in
+                                                         # admin interface,
+                                                         # not in database
     start_time = DateTimeField(_("Start Time of Public Canvas Editing"))
     end_time = DateTimeField(_("Time the Canvas Will Stop Accepting Edits"))
     grid_length = PositiveSmallIntegerField(
-        _("The Total Grid Size is this squared"), default=8)  # Assumes a square grid
+        _("The Total Grid Size is this squared"), default=8)  # Assumes a
+                                                              # square grid
     cell_divisions = PositiveSmallIntegerField(_("Cell Divisions"), default=8)
-    creator = ForeignKey(AUTH_USER_MODEL, null=True, on_delete=SET_NULL)  # _("Person who created this Visual Canvas")
+    creator = ForeignKey(AUTH_USER_MODEL, null=True, on_delete=SET_NULL,
+                         verbose_name=_("Person who created this Visual"
+                                        "Canvas"))
 
     def __str__(self):
         return self.title
@@ -40,10 +45,11 @@ class VisualCell(Model):
 
     """A cell in a VisualCanvas."""
 
-    canvas = ForeignKey(VisualCanvas, on_delete=CASCADE)  # _("Canvas Cell is Associated With"),
-    artist = ForeignKey(AUTH_USER_MODEL, null=True, blank=True, on_delete=SET_NULL)
-                                                      # Initial grid won't have users assigned
-                                                      # _("Artist for this Part of the Canvas"),
+    canvas = ForeignKey(VisualCanvas, on_delete=CASCADE,
+                        verbose_name=_("Canvas Cell is Associated With")),
+    artist = ForeignKey(AUTH_USER_MODEL, null=True, blank=True,
+                        on_delete=SET_NULL,
+                        verbose_name=_("Artist for this Part of the Canvas"),)
     vertical_place = PositiveSmallIntegerField()
     horizontal_place = PositiveSmallIntegerField()
 

@@ -1,30 +1,16 @@
 from datetime import timedelta
 
-from django.test import TestCase, RequestFactory
 from django.utils import timezone
 
-import pytest
-
-from collab_canvas.users.models import User
-
 from ..models import VisualCanvas  # , CELL_NEIGHBOURS
+from .utils import BaseVisualCanvasTest
 
 
-@pytest.mark.django_db
-class TestGeneratingVisualGrid(TestCase):
+class TestTorusGrid(BaseVisualCanvasTest):
 
     """Test initiating a VisualCanvas"""
 
-    def setUp(self):
-        self.super_user = User.objects.create_superuser(username="test_super",
-                                                        email="test@test.com",
-                                                        password="secret")
-        self.user = User.objects.create_user(username="test_user",
-                                             email="test@test.com",
-                                             password="secret")
-        self.factory = RequestFactory()
-
-    def test_creating_torus(self):
+    def test_creating_2x2torus(self):
         """Test basic creation of a torus."""
         canvas = VisualCanvas.objects.create(
             title='Test Torus',
@@ -35,6 +21,7 @@ class TestGeneratingVisualGrid(TestCase):
             is_torus=True
         )
         self.assertEqual(canvas.visual_cells.count(), 4)
+
         # self.subTest()
         # for cell in canvas.visual_cells.order_by('x_position', 'y_position'):
         #     with self.subTest(cell=cell):
@@ -43,17 +30,26 @@ class TestGeneratingVisualGrid(TestCase):
         # test_cell = canvas.objects.get(x_position=1, y_position=0)
         # self.assertEqual(test_cell.get_neighbours(),
 
+
+class TestNonTorusGrid(BaseVisualCanvasTest):
+
+    """
+    Test generating a grid that isn't a torus.
+
+    Crucially, these edge cells never have a full grid of neighbours.
+    """
+
     def test_non_grid(self):
         """Test creation a non-grid canvas."""
         canvas = VisualCanvas.objects.create(
             title='Test Non-Grid',
             start_time=timezone.now(),
             end_time=timezone.now() + timedelta(seconds=20),
-            grid_length=0,
+            grid_length=2,
             creator=self.super_user,
             is_torus=False
         )
-        self.assertEqual(canvas.visual_cells.count(), 0)
+        self.assertEqual(canvas.visual_cells.count(), 4)
 
     # def test_creating_grid_permission(self):
     #     try:

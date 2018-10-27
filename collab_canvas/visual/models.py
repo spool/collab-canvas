@@ -68,7 +68,7 @@ class VisualCanvas(Model):
     is_torus = BooleanField(_("Initialize a torus grid that can't be changed"))
 
     def __str__(self):
-        return f'{self.title} ends {self.end_time}'
+        return f'{self.title} ends {self.end_time:%Y-%m-%d %H:%M}'
 
     def clean(self):
         if self.is_torus and self.grid_length is None:
@@ -91,13 +91,29 @@ class VisualCanvas(Model):
         if self.grid_length is None:
             raise ValidationError(_('Max of coordinates requires a defined'
                                     'length'))
-        return (self.grid_length, self.grid_length)
+        return (self.grid_length - 1, self.grid_length - 1)
 
     def correct_coordinates_for_torus(self, coordinates):
+        """
+        Enforce coordinates for a torus grid.
+
+        This method projects negative coordinates to positive ones. Requires
+        a torus of length >= 3.
+        """
+        type_correct = False
+        if type(coordinates) is not list:
+            coordinates = list(coordinates)
+            type_correct = True
         if coordinates[0] > self.max_coordinates[0]:
             coordinates[0] = 0
+        elif coordinates[0] < 0:
+            coordinates[0] = self.max_coordinates[0]
         if coordinates[1] > self.max_coordinates[1]:
             coordinates[1] = 0
+        elif coordinates[1] < 0:
+            coordinates[1] = self.max_coordinates[1]
+        if type_correct:
+            return tuple(coordinates)
         return coordinates
 
     # def find_empty_torus_cell(self):
@@ -226,6 +242,10 @@ class VisualCell(Model):
                 not self.canvas.grid_length > self.y_position > 0):
             raise ValidationError(_('Cell position is outside the grid'))
 
+    @property
+    def coordinates(self):
+        return (self.x_position, self.y_position)
+
     # north = ForeignKey('VisualCell', related_name="south_cell", blank=True,
     #                    null=True, on_delete=SET_NULL)
     # north_east = ForeignKey('VisualCell', related_name="south_west_cell",
@@ -270,16 +290,25 @@ class VisualCell(Model):
                                edges_south_east=blank_list,
                                edges_south_west=blank_list)
 
-    def get_neighbours(self):
+    def get_neighbours(self, as_tuple=False):
+        """
+        Return Moore's neighbours, including torus neighbours if appropriate.
+        """
         neighbours = {}
         for direction, coordinate_difference in CELL_NEIGHBOURS.items():
+            coords = (self.x_position + coordinate_difference[0],
+                      self.y_position + coordinate_difference[1])
+            if self.canvas.is_torus:
+                coords = self.canvas.correct_coordinates_for_torus(coords)
             try:
-                neighbour = self.canvas.visual_cells.get(
-                    x_position=self.x_position + coordinate_difference[0],
-                    y_position=self.y_position + coordinate_difference[1])
+                neighbour = self.canvas.visual_cells.get(x_position=coords[0],
+                                                         y_position=coords[1])
             except VisualCell.DoesNotExist:
                 neighbour = None
-            neighbours[direction] = neighbour
+            if neighbour and as_tuple:
+                neighbours[direction] = neighbour.coordinates
+            else:
+                neighbours[direction] = neighbour
         return neighbours
 
     # def set_neighbours(self):

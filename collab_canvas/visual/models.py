@@ -80,16 +80,6 @@ class VisualCanvas(Model):
             for y in range(self.grid_length):
                 self.visual_cells.create(x_position=x, y_position=y)
 
-    # @property
-    # def torus_grid(self):
-    #     """
-    #     Indicate if a torus.
-
-    #     Note:
-    #         * If grid_width is included then that will also need testing
-    #     """
-    #     return self.grid_length is None
-
     @property
     def max_coordinates(self):
         """
@@ -109,11 +99,6 @@ class VisualCanvas(Model):
         if coordinates[1] > self.max_coordinates[1]:
             coordinates[1] = 0
         return coordinates
-
-    # def initiate_torus_links(self)
-    #     for x in range(self.grid_length):
-    #         for y in range(x + 1):
-    #             self.visual_cells.add(x_position=x, y_position=y)
 
     # def find_empty_torus_cell(self):
     #     """Query for place for a new cell."""

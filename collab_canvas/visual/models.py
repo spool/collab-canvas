@@ -16,7 +16,8 @@ from django.db.models import (CASCADE, SET_NULL, CharField, BooleanField,
 from django.utils.text import slugify
 from django.utils.translation import ugettext_lazy as _
 
-from random import shuffle
+from random import shuffle, choice
+
 
 CELL_ADJACENTS = {
     'north': (0, 1),
@@ -93,12 +94,34 @@ class VisualCanvas(Model):
                                     'length'))
         return (self.grid_length - 1, self.grid_length - 1)
 
+    def get_centre_cell_coordinates(self):
+        """Return the centre most cell max x, max y points."""
+        if self.grid_length:
+            return (self.max_coordinates[0]//2, self.max_coordinates[1]//2)
+        else:
+            return (0, 0)
+
+    def get_random_cell_coordinates(self):
+        """
+        Get pure random cell (possibly just coordinates of) from canvas.
+
+        For non grid cnavasas this might be annoyingly slow.
+        """
+        if self.grid_length:  # Note: must add 1 to include max coordinate
+            return (choice(list(range(self.max_coordinates[0] + 1))),
+                    choice(list(range(self.max_coordinates[1] + 1))))
+        else:
+            self.visual_cells.order_by('?').first().coordinates
+
     def correct_coordinates_for_torus(self, coordinates):
         """
         Enforce coordinates for a torus grid.
 
         This method projects negative coordinates to positive ones. Requires
         a torus of length >= 3.
+
+        Todo:
+            * Rewrite to more efficiently handle type issues.
         """
         type_correct = False
         if type(coordinates) is not list:
@@ -132,12 +155,18 @@ class VisualCanvas(Model):
     #         if
     #     return choice(available_cells)
 
-    def create_new_contiguous_cell(self):
+    INITIAL_CELL_METHODS = {
+        'centre': 'get_centre_cell_coordinates',
+        'random': 'get_random_cell_coordinates',
+    }
+
+    def get_or_create_contiguous_cell(self, first_cell_algorithm='centre'):
         """
         Find a continguous cell that's not owned
 
         Todo:
             * May be applicable to torus **and** organic growth
+            * Test algorithm dict method
         """
         # if self.torus_grid:
         #     raise ValidationError(_('New cells cannot be added to a torus grid.'))
@@ -153,12 +182,20 @@ class VisualCanvas(Model):
         #     x_direction = choose([-1, 1])
         #     y_direction = choice([-1, 1])
         # x_limit =
-        coordinate_differences = CELL_ADJACENTS.values()
         # if self.torus_grid:
         #     cells = self.visual_cells.filter(artist__isnull=True)
         # else:
-        allocated_cells = self.visual_cells.values_list('x_position',
-                                                        'y_position')
+        allocated_cells = list(self.visual_cells.exclude(
+            artist__isnull=True).values_list('x_position', 'y_position'))
+        if not allocated_cells:
+            if not self.grid_length and not self.is_torus:
+                return self.visual_cells.create(x_position=0, y_position=0)
+            else:
+                coords = getattr(
+                    self, self.INITIAL_CELL_METHODS[first_cell_algorithm])()
+                return self.visual_cells.get(x_position=coords[0],
+                                             y_position=coords[1])
+        coordinate_differences = list(CELL_ADJACENTS.values())
         shuffle(allocated_cells)
         for cell in allocated_cells:
             shuffle(coordinate_differences)
@@ -167,9 +204,9 @@ class VisualCanvas(Model):
                                   cell[1] + coordinate_difference[1])
                 if potential_cell not in allocated_cells:  # Might choose a pre-allocated cell
                     if not self.grid_length:
-                        return VisualCell(canvas=self,
-                                          x_position=potential_cell[0],
-                                          y_position=potential_cell[1])
+                        return self.visual_cells.add(
+                            x_position=potential_cell[0],
+                            y_position=potential_cell[1])
                     if self.is_torus:
                         potential_cell = self.correct_coordinates_for_torus(
                             potential_cell)

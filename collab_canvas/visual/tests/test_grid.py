@@ -1,17 +1,29 @@
 from datetime import timedelta
 
+from random import seed
+
+from unittest import skip
+
 from django.utils import timezone
 
-from ..models import VisualCanvas  # , CELL_NEIGHBOURS
-from .utils import BaseVisualCanvasTest
+from ..models import VisualCanvas
+from .utils import BaseCreateVisualCanvasTest, BaseVisualCanvasUserTest
 
 
-class TestTorusGrid(BaseVisualCanvasTest):
+seed(3141592)
 
-    """Test initiating a VisualCanvas"""
+
+class TestCreatingTorusGrid(BaseCreateVisualCanvasTest):
+
+    """
+    Test initiating a VisualCanvas
+
+    Todo:
+        * Fix 2x2 and 1x1 options or enforce minimum 3x3.
+    """
 
     def test_creating_3x3_torus(self):
-        """Test basic creation of a torus."""
+        """Test basic creation of a 3x3 torus."""
         CORRECT_CELL_NEIGHBOURS = {
             (0, 0): {'north': (0, 1), 'north_east': (1, 1),
                      'east': (1, 0), 'south_east': (1, 2),
@@ -64,8 +76,56 @@ class TestTorusGrid(BaseVisualCanvasTest):
                 self.assertEqual(cell.get_neighbours(as_tuple=True),
                                  CORRECT_CELL_NEIGHBOURS[cell.coordinates])
 
+    @skip("Not yet implemented")
+    def test_creating_2x2_torus(self):
+        """Test creating a 2x2 torus."""
+        pass
 
-class TestNonTorusGrid(BaseVisualCanvasTest):
+    @skip("Not yet implemented")
+    def test_creating_1x2_torus(self):
+        """Test creating a 2x2 torus."""
+        pass
+
+
+class TestTorusGridUsage(BaseVisualCanvasUserTest):
+
+    """Test Torus grid editing."""
+
+    # fixtures = ['base_3x3_torus.json']
+
+    def setUp(self):
+        """Add custom initiation for Torus base 3x3 case."""
+        super().setUp()
+        self.canvas = VisualCanvas.objects.create(
+            title='Test Editing Torus',
+            start_time=timezone.now(),
+            end_time=timezone.now() + timedelta(minutes=20),
+            grid_length=3,
+            creator=self.super_user,
+            is_torus=True
+        )
+
+    def test_get_centre_cell(self):
+        """Test getting centre cell."""
+        self.assertEqual(self.canvas.get_centre_cell_coordinates(), (1, 1))
+
+    def test_get_random_cell_coordinates(self):
+        """Test getting a random cell within the torus."""
+        self.assertEqual(self.canvas.get_random_cell_coordinates(), (2, 2))
+
+    def test_get_central_initial_cell(self):
+        """Test assigning cell to a user."""
+        cell = self.canvas.get_or_create_contiguous_cell()
+        self.assertEqual(cell.coordinates, (1, 1))
+
+    def test_get_random_initial_cell(self):
+        """Test assigning cell to a user."""
+        cell = self.canvas.get_or_create_contiguous_cell(
+            first_cell_algorithm='random')
+        self.assertEqual(cell.coordinates, (0, 1))
+
+
+class TestNonTorusGrid(BaseCreateVisualCanvasTest):
 
     """
     Test generating a grid that isn't a torus.

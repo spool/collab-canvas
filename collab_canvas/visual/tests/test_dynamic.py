@@ -3,10 +3,10 @@ from datetime import timedelta
 from django.utils import timezone
 
 from ..models import VisualCanvas  # , CELL_NEIGHBOURS
-from .utils import BaseCreateVisualCanvasTest
+from .utils import BaseVisualTest
 
 
-class TestGeneratingEmptyCanvas(BaseCreateVisualCanvasTest):
+class TestGeneratingEmptyCanvas(BaseVisualTest):
 
     """
     Test generating a grid that isn't a torus.

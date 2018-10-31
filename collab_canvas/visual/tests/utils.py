@@ -8,9 +8,9 @@ from collab_canvas.users.models import User
 
 
 @pytest.mark.django_db
-class BaseCreateVisualCanvasTest(TestCase):
+class BaseVisualTest(TestCase):
 
-    """Base inheritable class for testing initializing blank canvas."""
+    """Base inheritable class to cover atomic tests with canvas creation."""
 
     def setUp(self):
         self.super_user = User.objects.create_superuser(username="test_super",
@@ -18,17 +18,17 @@ class BaseCreateVisualCanvasTest(TestCase):
                                                         password="secret")
 
 
-class BaseVisualCanvasUserTest(BaseCreateVisualCanvasTest):
+@pytest.mark.django_db
+class BaseTransactionVisualTest(TestCase):
 
-    """Base inheritable class for testing user interaction."""
+    """Base inheritable class which can also handle transactions/rollbacks."""
 
     def setUp(self):
-        super().setUp()
-        self.user = User.objects.create_user(username="test_user",
-                                             email="test@test.com",
-                                             password="secret")
+        self.super_user = User.objects.create_superuser(username="test_super",
+                                                        email="test@test.com",
+                                                        password="secret")
         self.anonymous_user = AnonymousUser()
-        self.factory = RequestFactory()
+        self.requests = RequestFactory
 
 
 def dump_data(query_sets, file_format="json", indent=2):

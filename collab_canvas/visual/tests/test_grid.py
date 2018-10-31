@@ -4,16 +4,18 @@ from random import seed
 
 from unittest import skip
 
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 
+from collab_canvas.users.models import User
 from ..models import VisualCanvas
-from .utils import BaseCreateVisualCanvasTest, BaseVisualCanvasUserTest
+from .utils import BaseVisualTest, BaseTransactionVisualTest
 
 
 seed(3141592)
 
 
-class TestCreatingTorusGrid(BaseCreateVisualCanvasTest):
+class TestCreatingTorusGrid(BaseVisualTest):
 
     """
     Test initiating a VisualCanvas
@@ -87,7 +89,7 @@ class TestCreatingTorusGrid(BaseCreateVisualCanvasTest):
         pass
 
 
-class TestTorusGridUsage(BaseVisualCanvasUserTest):
+class TestTorusGridUsage(BaseTransactionVisualTest):
 
     """Test Torus grid editing."""
 
@@ -104,6 +106,8 @@ class TestTorusGridUsage(BaseVisualCanvasUserTest):
             creator=self.super_user,
             is_torus=True
         )
+        self.user = User.objects.create(name="Test User", email="test@t.com",
+                                        password="test")
 
     def test_get_centre_cell(self):
         """Test getting centre cell."""
@@ -124,8 +128,40 @@ class TestTorusGridUsage(BaseVisualCanvasUserTest):
             first_cell_algorithm='random')
         self.assertEqual(cell.coordinates, (0, 1))
 
+    def test_unique_cell_per_canvas(self):
+        pass
 
-class TestNonTorusGrid(BaseCreateVisualCanvasTest):
+    def test_series_of_cells_from_central(self):
+        """Test a cell assignments, including preventing a duo assignment."""
+        cell1 = self.canvas.get_or_create_contiguous_cell()
+        cell1.artist = self.user
+        cell1.save()
+        self.assertEqual(cell1.coordinates, (1, 1))
+        cell2 = self.canvas.get_or_create_contiguous_cell()
+        self.assertEqual(cell2.coordinates, (0, 1))
+        user2 = User.objects.create(name="Other user longer name",
+                                    username="user_2",
+                                    email="test@tother.com",
+                                    password="sillyrabit")
+        cell2.artist = user2
+        cell2.save()
+        self.assertIn(cell2, user2.visual_cells.all())
+
+    def test_unique_artist_per_canvas(self):
+        """Test enforcing uniquen users per canvas."""
+        cell = self.canvas.get_or_create_contiguous_cell()
+        self.assertEqual(cell.coordinates, (1, 1))
+        cell.artist = self.user
+        cell.save()
+        cell2 = self.canvas.get_or_create_contiguous_cell()
+        cell2.artist = self.user
+        with transaction.atomic():
+            with self.assertRaises(IntegrityError):
+                cell2.save()
+        self.assertNotIn(cell2, self.user.visual_cells.all())
+
+
+class TestNonTorusGrid(BaseVisualTest):
 
     """
     Test generating a grid that isn't a torus.

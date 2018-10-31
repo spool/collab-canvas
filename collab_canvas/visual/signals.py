@@ -16,8 +16,3 @@ def initialize_blank_cell(sender, **kwargs):
     """Initiate a blank VisualCellEdit when creating a VisualCell."""
     if kwargs['created']:
         kwargs['instance'].set_blank()
-        # blank_list = cell.default_blank_list()
-        # cell.cell_edits.create(edges_horizontal=blank_list,
-        #                        edges_vertical=blank_list,
-        #                        edges_south_east=blank_list,
-        #                        edges_south_west=blank_list)

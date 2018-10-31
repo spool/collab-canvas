@@ -273,6 +273,13 @@ class VisualCell(Model):
     y_position = IntegerField()
     x_position = IntegerField()
 
+    class Meta:
+
+        """Enforce efficiency and correctness within each canvas."""
+
+        unique_together = (("canvas", "artist"),
+                           ("canvas", "x_position", "y_position"))
+
     def clean(self):
         if (self.canvas.grid_length and
                 not self.canvas.grid_length > self.x_position > 0 or

@@ -4,11 +4,12 @@ from random import seed
 
 from unittest import skip
 
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from collab_canvas.users.models import User
-from ..models import VisualCanvas
+from ..models import VisualCanvas, VisualCell
 from .utils import BaseVisualTest, BaseTransactionVisualTest
 
 
@@ -128,9 +129,6 @@ class TestTorusGridUsage(BaseTransactionVisualTest):
             first_cell_algorithm='random')
         self.assertEqual(cell.coordinates, (0, 1))
 
-    def test_unique_cell_per_canvas(self):
-        pass
-
     def test_series_of_cells_from_central(self):
         """Test a cell assignments, including preventing a duo assignment."""
         cell1 = self.canvas.get_or_create_contiguous_cell()
@@ -168,40 +166,106 @@ class TestNonTorusGrid(BaseVisualTest):
 
     Crucially, these edge cells never have a full grid of neighbours.
     """
+    CORRECT_CELL_NEIGHBOURS = {
+        (0, 0): {'north': (0, 1), 'north_east': (1, 1),
+                 'east': (1, 0), 'south_east': None,
+                 'south': None, 'south_west': None,
+                 'west': None, 'north_west': None},
+        (1, 0): {'north': (1, 1), 'north_east': None,
+                 'east': None, 'south_east': None,
+                 'south': None, 'south_west': None,
+                 'west': (0, 0), 'north_west': (0, 1)},
+        (0, 1): {'north': None, 'north_east': None,
+                 'east': (1, 1), 'south_east': (1, 0),
+                 'south': (0, 0), 'south_west': None,
+                 'west': None, 'north_west': None},
+        (1, 1): {'north': None, 'north_east': None,
+                 'east': None, 'south_east': None,
+                 'south': (1, 0), 'south_west': (0, 0),
+                 'west': (0, 1), 'north_west': None},
+    }
 
-    def test_not_tuple_grid(self):
-        """Test creation a non-grid canvas."""
-        CORRECT_CELL_NEIGHBOURS = {
-            (0, 0): {'north': (0, 1), 'north_east': (1, 1),
-                     'east': (1, 0), 'south_east': None,
-                     'south': None, 'south_west': None,
-                     'west': None, 'north_west': None},
-            (1, 0): {'north': (1, 1), 'north_east': None,
-                     'east': None, 'south_east': None,
-                     'south': None, 'south_west': None,
-                     'west': (0, 0), 'north_west': (0, 1)},
-            (0, 1): {'north': None, 'north_east': None,
-                     'east': (1, 1), 'south_east': (1, 0),
-                     'south': (0, 0), 'south_west': None,
-                     'west': None, 'north_west': None},
-            (1, 1): {'north': None, 'north_east': None,
-                     'east': None, 'south_east': None,
-                     'south': (1, 0), 'south_west': (0, 0),
-                     'west': (0, 1), 'north_west': None},
-        }
-        canvas = VisualCanvas.objects.create(
+    def setUp(self):
+        """Create base initialised grid for testing."""
+        super().setUp()
+        self.canvas = VisualCanvas.objects.create(
             title='Test Non-Grid',
             start_time=timezone.now(),
-            end_time=timezone.now() + timedelta(seconds=20),
+            end_time=timezone.now() + timedelta(seconds=600),
             grid_length=2,
             creator=self.super_user,
             is_torus=False
         )
-        self.assertEqual(canvas.visual_cells.count(), 4)
-        for cell in canvas.visual_cells.order_by('x_position', 'y_position'):
-            with self.subTest(cell=cell):
+
+    def test_not_torus_grid(self):
+        """Test creation a non-grid canvas."""
+        self.assertEqual(self.canvas.visual_cells.count(), 4)
+        for cell in self.canvas.visual_cells.order_by('x_position',
+                                                      'y_position'):
+            with self.subTest("Check each cell for correct neighbours",
+                              cell=cell):
                 self.assertEqual(cell.get_neighbours(as_tuple=True),
-                                 CORRECT_CELL_NEIGHBOURS[cell.coordinates])
+                                 self.CORRECT_CELL_NEIGHBOURS[
+                                     cell.coordinates])
+
+    def test_no_duplicate_cells_can_be_added(self):
+        """Duplicate cells on a canvas should raise an integrity error."""
+        with transaction.atomic():
+            with self.assertRaises(IntegrityError):
+                bad_cell = VisualCell(x_position=0, y_position=0,
+                                      canvas=self.canvas)
+                bad_cell.save()
+
+    def test_no_cells_can_be_added_outside_the_grid(self):
+        """Test all ways cells outside crid should raise ValidationError."""
+        with self.subTest("Both coordinates > than canvas"):
+            with transaction.atomic():
+                with self.assertRaises(ValidationError) as error:
+                    bad_cell = VisualCell(x_position=7, y_position=7,
+                                          canvas=self.canvas)
+                    bad_cell.full_clean()
+                self.assertIn('Cell position (7, 7) is outside the grid',
+                              str(error.exception))
+        with self.subTest("y_position > than canvas"):
+            with transaction.atomic():
+                with self.assertRaises(ValidationError) as error:
+                    bad_cell = VisualCell(x_position=0, y_position=7,
+                                          canvas=self.canvas)
+                    bad_cell.full_clean()
+                self.assertIn('Cell position (0, 7) is outside the grid',
+                              str(error.exception))
+        with self.subTest("x_position > than canvas"):
+            with transaction.atomic():
+                with self.assertRaises(ValidationError) as error:
+                    bad_cell = VisualCell(x_position=7, y_position=0,
+                                          canvas=self.canvas)
+                    bad_cell.full_clean()
+                self.assertIn('Cell position (7, 0) is outside the grid',
+                              str(error.exception))
+        with self.subTest("x_position < than canvas"):
+            with transaction.atomic():
+                with self.assertRaises(ValidationError) as error:
+                    bad_cell = VisualCell(x_position=-1, y_position=0,
+                                          canvas=self.canvas)
+                    bad_cell.full_clean()
+                self.assertIn('Cell position (-1, 0) is outside the grid',
+                              str(error.exception))
+        with self.subTest("y_position < than canvas"):
+            with transaction.atomic():
+                with self.assertRaises(ValidationError) as error:
+                    bad_cell = VisualCell(x_position=0, y_position=-1,
+                                          canvas=self.canvas)
+                    bad_cell.full_clean()
+                self.assertIn('Cell position (0, -1) is outside the grid',
+                              str(error.exception))
+        with self.subTest("Both coordinates < than canvas"):
+            with transaction.atomic():
+                with self.assertRaises(ValidationError) as error:
+                    bad_cell = VisualCell(x_position=-1, y_position=-1,
+                                          canvas=self.canvas)
+                    bad_cell.full_clean()
+                self.assertIn('Cell position (-1, -1) is outside the grid',
+                              str(error.exception))
 
     # def test_creating_grid_permission(self):
     #     try:

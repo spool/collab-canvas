@@ -281,10 +281,12 @@ class VisualCell(Model):
                            ("canvas", "x_position", "y_position"))
 
     def clean(self):
+        """Means of testing if cell is outside a pre-defined grid."""
         if (self.canvas.grid_length and
-                not self.canvas.grid_length > self.x_position > 0 or
-                not self.canvas.grid_length > self.y_position > 0):
-            raise ValidationError(_('Cell position is outside the grid'))
+                not self.canvas.grid_length > self.x_position >= 0 or
+                not self.canvas.grid_length > self.y_position >= 0):
+            raise ValidationError(_(f'Cell position {self.coordinates} is '
+                                    'outside the grid'))
 
     @property
     def coordinates(self):

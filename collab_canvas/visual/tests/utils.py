@@ -39,6 +39,5 @@ def dump_data(query_sets, file_format="json", indent=2):
     """
     JSONSerializer = serializers.get_serializer(file_format)
     json_serializer = JSONSerializer()
-    # data = json_serializer.getvalue()
     with open("fixture_dump.json", "w") as dump_file:
         json_serializer.serialize(query_sets, stream=dump_file, indent=indent)

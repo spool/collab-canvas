@@ -221,6 +221,8 @@ class VisualCanvas(Model):
                     if self.is_torus:
                         potential_cell = self.correct_coordinates_for_torus(
                             potential_cell)
+                        if potential_cell in allocated_cells:
+                            continue
                     else:  # Grid but not torus
                         if (not 0 <= potential_cell[0] < self.grid_length or
                                 not 0 <= potential_cell[1] < self.grid_length):
@@ -234,8 +236,8 @@ class VisualCanvas(Model):
                     except VisualCell.DoesNotExist:
                         raise VisualCell.DoesNotExist(_("No cell with that position"))
                     except AssertionError:
-                        raise ValidationError(_("That cell is already owned by"
-                                                "another artist"))
+                        raise ValidationError(_("That cell is already owned by "
+                                                f"another artist {blank_cell.artist}"))
 
     class FullGridException(Exception):
         pass

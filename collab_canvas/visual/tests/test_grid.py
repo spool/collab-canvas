@@ -116,7 +116,7 @@ class TestTorusGridUsage(BaseTransactionVisualTest):
 
     def test_get_random_cell_coordinates(self):
         """Test getting a random cell within the torus."""
-        self.assertEqual(self.canvas.get_random_cell_coordinates(), (2, 2))
+        self.assertEqual(self.canvas.get_random_cell_coordinates(), (1, 2))
 
     def test_get_central_initial_cell(self):
         """Test assigning cell to a user."""
@@ -127,23 +127,44 @@ class TestTorusGridUsage(BaseTransactionVisualTest):
         """Test assigning cell to a user."""
         cell = self.canvas.get_or_create_contiguous_cell(
             first_cell_algorithm='random')
-        self.assertEqual(cell.coordinates, (0, 1))
+        self.assertEqual(cell.coordinates, (1, 0))
 
-    def test_series_of_cells_from_central(self):
+    def test_fill_torus_canvas_from_centre(self):
         """Test a cell assignments, including preventing a duo assignment."""
-        cell1 = self.canvas.get_or_create_contiguous_cell()
-        cell1.artist = self.user
-        cell1.save()
-        self.assertEqual(cell1.coordinates, (1, 1))
-        cell2 = self.canvas.get_or_create_contiguous_cell()
-        self.assertEqual(cell2.coordinates, (0, 1))
-        user2 = User.objects.create(name="Other user longer name",
-                                    username="user_2",
-                                    email="test@tother.com",
-                                    password="sillyrabit")
-        cell2.artist = user2
-        cell2.save()
-        self.assertIn(cell2, user2.visual_cells.all())
+        CORRECT_CELL_ARTISTS = {
+            (0, 0): 'test7',
+            (0, 1): 'test3',
+            (0, 2): 'test8',
+            (1, 0): 'test1',
+            (1, 1): 'test0',
+            (1, 2): 'test5',
+            (2, 0): 'test2',
+            (2, 1): 'test4',
+            (2, 2): 'test6',
+        }
+        users = [
+            User.objects.create(username=f'test{i}', email=f'test{1}@test.com',
+                                password=f'test{i}')
+            for i in range(9)
+        ]
+        for user in users:
+            if user.username == 'test9':  # Test when all cells are allocated
+                with self.subTest('Test grid allocation exception'):
+                    with transaction.atomic():
+                        with self.assertRaises(self.canvas.FullGridException):
+                            cell = self.canvas.get_or_create_contiguous_cell()
+            else:
+                cell = self.canvas.get_or_create_contiguous_cell()
+                cell.artist = user
+                cell.save()
+        for cell_coordinates, username in CORRECT_CELL_ARTISTS.items():
+            with self.subTest(f"Check cell {cell_coordinates} has correct owner "
+                              f"{username}.",
+                              cell_coordinates=cell_coordinates,
+                              username=username):
+                cell = self.canvas.visual_cells.get(x_position=cell_coordinates[0],
+                                                    y_position=cell_coordinates[1])
+                self.assertEqual(cell.artist.username, username)
 
     def test_unique_artist_per_canvas(self):
         """Test enforcing uniquen users per canvas."""

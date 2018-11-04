@@ -116,7 +116,7 @@ class TestTorusGridUsage(BaseTransactionVisualTest):
 
     def test_get_random_cell_coordinates(self):
         """Test getting a random cell within the torus."""
-        self.assertEqual(self.canvas.get_random_cell_coordinates(), (1, 2))
+        self.assertEqual(self.canvas.get_random_cell_coordinates(), (2, 1))
 
     def test_get_central_initial_cell(self):
         """Test assigning cell to a user."""
@@ -127,20 +127,20 @@ class TestTorusGridUsage(BaseTransactionVisualTest):
         """Test assigning cell to a user."""
         cell = self.canvas.get_or_create_contiguous_cell(
             first_cell_algorithm='random')
-        self.assertEqual(cell.coordinates, (1, 0))
+        self.assertEqual(cell.coordinates, (2, 0))
 
     def test_fill_torus_canvas_from_centre(self):
         """Test a cell assignments, including preventing a duo assignment."""
         CORRECT_CELL_ARTISTS = {
-            (0, 0): 'test7',
-            (0, 1): 'test3',
-            (0, 2): 'test8',
-            (1, 0): 'test1',
+            (0, 0): 'test4',
+            (0, 1): 'test7',
+            (0, 2): 'test6',
+            (1, 0): 'test2',
             (1, 1): 'test0',
             (1, 2): 'test5',
-            (2, 0): 'test2',
-            (2, 1): 'test4',
-            (2, 2): 'test6',
+            (2, 0): 'test3',
+            (2, 1): 'test1',
+            (2, 2): 'test8',
         }
         users = [
             User.objects.create(username=f'test{i}', email=f'test{1}@test.com',
@@ -187,6 +187,7 @@ class TestNonTorusGrid(BaseVisualTest):
 
     Crucially, these edge cells never have a full grid of neighbours.
     """
+
     CORRECT_CELL_NEIGHBOURS = {
         (0, 0): {'north': (0, 1), 'north_east': (1, 1),
                  'east': (1, 0), 'south_east': None,
@@ -210,7 +211,7 @@ class TestNonTorusGrid(BaseVisualTest):
         """Create base initialised grid for testing."""
         super().setUp()
         self.canvas = VisualCanvas.objects.create(
-            title='Test Non-Grid',
+            title='Test Non-Torus Grid',
             start_time=timezone.now(),
             end_time=timezone.now() + timedelta(seconds=600),
             grid_length=2,
@@ -218,7 +219,7 @@ class TestNonTorusGrid(BaseVisualTest):
             is_torus=False
         )
 
-    def test_not_torus_grid(self):
+    def test_non_torus_grid(self):
         """Test creation a non-grid canvas."""
         self.assertEqual(self.canvas.visual_cells.count(), 4)
         for cell in self.canvas.visual_cells.order_by('x_position',

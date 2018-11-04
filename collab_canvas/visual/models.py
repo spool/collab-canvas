@@ -215,9 +215,9 @@ class VisualCanvas(Model):
                                   cell[1] + coordinate_difference[1])
                 if potential_cell not in allocated_cells:  # Might choose a pre-allocated cell
                     if not self.grid_length:
-                        return self.visual_cells.add(
-                            x_position=potential_cell[0],
-                            y_position=potential_cell[1])
+                        return VisualCell(x_position=potential_cell[0],
+                                          y_position=potential_cell[1],
+                                          canvas=self)
                     if self.is_torus:
                         potential_cell = self.correct_coordinates_for_torus(
                             potential_cell)

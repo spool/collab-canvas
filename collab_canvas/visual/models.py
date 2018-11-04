@@ -50,6 +50,10 @@ class VisualCanvas(Model):
     grid_length will enforce the maximum edges but not connect edge neighbours.
     If grid length is not defined then the canvas will grow with positive and
     negative coordinates organically with each new artist.
+
+    Todo:
+        * Consider more flexible canvas shapes
+        * Consider at least allowing x/y length
     """
 
     title = CharField(_("Canvas Title"), max_length=100)
@@ -160,13 +164,24 @@ class VisualCanvas(Model):
         'random': 'get_random_cell_coordinates',
     }
 
+    def choose_initial_cell(self, first_cell_algorithm='centre'):
+        """Select first cell based on canvas_type and first_cell_algorithm."""
+        if not self.grid_length and not self.is_torus:
+            return self.visual_cells.create(x_position=0, y_position=0)
+        else:
+            coords = getattr(
+                self, self.INITIAL_CELL_METHODS[first_cell_algorithm])()
+            return self.visual_cells.get(x_position=coords[0],
+                                         y_position=coords[1])
+
     def get_or_create_contiguous_cell(self, first_cell_algorithm='centre'):
         """
         Find a continguous cell that's not owned
 
         Todo:
-            * May be applicable to torus **and** organic growth
             * Test algorithm dict method
+            * Consdier ways of auto-filtering to edges of allocated cells
+            * Consider possibility of separate bubbles that can connect with basic radius
         """
         # if self.torus_grid:
         #     raise ValidationError(_('New cells cannot be added to a torus grid.'))
@@ -188,18 +203,14 @@ class VisualCanvas(Model):
         allocated_cells = list(self.visual_cells.exclude(
             artist__isnull=True).values_list('x_position', 'y_position'))
         if not allocated_cells:
-            if not self.grid_length and not self.is_torus:
-                return self.visual_cells.create(x_position=0, y_position=0)
-            else:
-                coords = getattr(
-                    self, self.INITIAL_CELL_METHODS[first_cell_algorithm])()
-                return self.visual_cells.get(x_position=coords[0],
-                                             y_position=coords[1])
-        coordinate_differences = list(CELL_ADJACENTS.values())
+            return self.choose_initial_cell(first_cell_algorithm)
+        if self.grid_length and len(allocated_cells) is self.grid_length**2:
+            raise self.FullGridException
+        COORDINATE_DIFFERENCES = list(CELL_ADJACENTS.values())
         shuffle(allocated_cells)
         for cell in allocated_cells:
-            shuffle(coordinate_differences)
-            for coordinate_difference in coordinate_differences:
+            shuffle(COORDINATE_DIFFERENCES)
+            for coordinate_difference in COORDINATE_DIFFERENCES:
                 potential_cell = (cell[0] + coordinate_difference[0],
                                   cell[1] + coordinate_difference[1])
                 if potential_cell not in allocated_cells:  # Might choose a pre-allocated cell
@@ -210,6 +221,10 @@ class VisualCanvas(Model):
                     if self.is_torus:
                         potential_cell = self.correct_coordinates_for_torus(
                             potential_cell)
+                    else:  # Grid but not torus
+                        if (not 0 <= potential_cell[0] < self.grid_length or
+                                not 0 <= potential_cell[1] < self.grid_length):
+                            continue
                     try:
                         blank_cell = self.visual_cells.get(
                             x_position=potential_cell[0],
@@ -217,10 +232,13 @@ class VisualCanvas(Model):
                         assert blank_cell.artist is None
                         return blank_cell
                     except VisualCell.DoesNotExist:
-                        raise VisualCell.DoesNotExist(_("No cell of that position"))
+                        raise VisualCell.DoesNotExist(_("No cell with that position"))
                     except AssertionError:
                         raise ValidationError(_("That cell is already owned by"
                                                 "another artist"))
+
+    class FullGridException(Exception):
+        pass
 
     def save(self, *args, **kwargs):
         """
@@ -323,7 +341,7 @@ class VisualCell(Model):
         return (
             f'({self.x_position}, {self.y_position}) '
             f'{self.canvas} - '
-            f'{self.artist.name if self.artist else "Not assigned"}'
+            f'{self.artist.username if self.artist else "Not assigned"}'
         )
 
     def default_blank_list(self):

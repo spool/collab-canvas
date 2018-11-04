@@ -10,7 +10,7 @@ from django.utils import timezone
 
 from collab_canvas.users.models import User
 from ..models import VisualCanvas, VisualCell
-from .utils import BaseVisualTest, BaseTransactionVisualTest
+from .utils import BaseVisualTest
 
 
 seed(3141592)
@@ -90,7 +90,7 @@ class TestCreatingTorusGrid(BaseVisualTest):
         pass
 
 
-class TestTorusGridUsage(BaseTransactionVisualTest):
+class TestTorusGridUsage(BaseVisualTest):
 
     """Test Torus grid editing."""
 

@@ -231,21 +231,22 @@ class TestNonTorusGrid(BaseVisualTest):
         ]
         for user in users:
             if user.username == 'test4':  # Test when all cells are allocated
-                with transaction.atomic():
-                    with self.assertRaises(self.canvas.FullGridException):
-                        cell = self.canvas.get_or_create_contiguous_cell()
+                with self.subTest('Test grid allocation exception'):
+                    with transaction.atomic():
+                        with self.assertRaises(self.canvas.FullGridException):
+                            cell = self.canvas.get_or_create_contiguous_cell()
             else:
                 cell = self.canvas.get_or_create_contiguous_cell()
                 cell.artist = user
                 cell.save()
         for cell_coordinates, username in CORRECT_CELL_ARTISTS.items():
-            # with self.subTest(f"Check cell {cell_coordinates} has correct owner "
-            #                   f"{username}.",
-            #                   cell_coordinates=cell_coordinates,
-            #                   username=username):
-            cell = self.canvas.visual_cells.get(x_position=cell_coordinates[0],
-                                                y_position=cell_coordinates[1])
-            self.assertEqual(cell.artist.username, username)
+            with self.subTest(f"Check cell {cell_coordinates} has correct owner "
+                              f"{username}.",
+                              cell_coordinates=cell_coordinates,
+                              username=username):
+                cell = self.canvas.visual_cells.get(x_position=cell_coordinates[0],
+                                                    y_position=cell_coordinates[1])
+                self.assertEqual(cell.artist.username, username)
 
     def test_no_cells_can_be_added_outside_the_grid(self):
         """Test all ways cells outside crid should raise ValidationError."""

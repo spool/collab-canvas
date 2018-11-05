@@ -28,8 +28,10 @@ class TestGeneratingEmptyCanvas(BaseVisualTest):
             start_time=timezone.now(),
             end_time=timezone.now() + timedelta(seconds=20),
             grid_length=0,
+            grid_width=0,
             creator=self.super_user,
-            is_torus=False
+            is_torus=False,
+            new_cells_allowed=True,
         )
 
     def test_unique_cell_per_canvas(self):

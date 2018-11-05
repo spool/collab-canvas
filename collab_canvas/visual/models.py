@@ -54,6 +54,7 @@ class VisualCanvas(Model):
     Todo:
         * Consider more flexible canvas shapes
         * Consider at least allowing x/y length
+        * Possibility of resizing canvas and making dynamic in future
     """
 
     title = CharField(_("Canvas Title"), max_length=100)
@@ -61,27 +62,41 @@ class VisualCanvas(Model):
     description = TextField(max_length=200, blank=True)
     start_time = DateTimeField(_("Start Time of Public Canvas Editing"))
     end_time = DateTimeField(_("Time the Canvas Will Stop Accepting Edits"))
+    grid_width = PositiveSmallIntegerField(
+        _("Grid horizontal (x) length, where max number of cells is this "
+          "times grid_length."),
+        default=8,)  # Default assumes a square grid
     grid_length = PositiveSmallIntegerField(
-        _("Torus grid length, where max number of cells is this squared. "
-          "If null, cells will spread."),
-        default=8,  # Default assumes a square grid
-        blank=True, null=True)
+        _("Grid vertical (y) length, where max number of cells is this "
+          "time grid_width."),
+        default=8,)  # Default assumes a square grid
     cell_divisions = PositiveSmallIntegerField(_("Cell Divisions"), default=8)
     creator = ForeignKey(AUTH_USER_MODEL, on_delete=CASCADE,
                          verbose_name=_("Person who created this Visual "
                                         "Canvas"))
-    is_torus = BooleanField(_("Initialize a torus grid that can't be changed"))
+    is_torus = BooleanField(_("Initialize a torus grid that can't be changed"),
+                            default=False)
+    new_cells_allowed = BooleanField(_("Allow new cells to be added"),
+                                     default=False)
 
     def __str__(self):
         return f'{self.title} ends {self.end_time:%Y-%m-%d %H:%M}'
 
+    @property
+    def is_grid(self):
+        """Test if both grid_with and grid_length are > 0."""
+        return self.grid_width > 0 and self.grid_length > 0
+
     def clean(self):
-        if self.is_torus and self.grid_length is None:
+        if self.is_torus and self.new_cells_allowed:
+            raise ValidationError(_('Torus VisualCanvases cannot add '
+                                    'new cells.'))
+        if self.is_torus and not self.is_grid:
             raise ValidationError(_('Torus VisualCanvases must have a length'))
 
     def generate_grid(self):
         """Generate a torus grid."""
-        for x in range(self.grid_length):
+        for x in range(self.grid_width):
             for y in range(self.grid_length):
                 self.visual_cells.create(x_position=x, y_position=y)
 
@@ -93,14 +108,21 @@ class VisualCanvas(Model):
         Note:
             * Implemented in case of future non-square (use grid_width if so).
         """
-        if self.grid_length is None:
+        if not self.is_grid:
             raise ValidationError(_('Max of coordinates requires a defined'
-                                    'length'))
-        return (self.grid_length - 1, self.grid_length - 1)
+                                    'grid'))
+        return (self.grid_width - 1, self.grid_length - 1)
 
     def get_centre_cell_coordinates(self):
-        """Return the centre most cell max x, max y points."""
-        if self.grid_length:
+        """
+        Apprixmate the centre most cell.
+
+        If the canvas is a grid, the floor middle x and y, otherwise (0, 0).
+
+        Todo:
+            * Consider ways of approximating the centre of other shapes
+        """
+        if self.is_grid:
             return (self.max_coordinates[0]//2, self.max_coordinates[1]//2)
         else:
             return (0, 0)
@@ -109,9 +131,11 @@ class VisualCanvas(Model):
         """
         Get pure random cell (possibly just coordinates of) from canvas.
 
-        For non grid cnavasas this might be annoyingly slow.
+        Todo:
+            * Add errors for cases of non-grid
+            * Consdier removing random for dynamic grid
         """
-        if self.grid_length:  # Note: must add 1 to include max coordinate
+        if self.is_grid:  # Note: must add 1 to include max coordinates
             return (choice(list(range(self.max_coordinates[0] + 1))),
                     choice(list(range(self.max_coordinates[1] + 1))))
         else:
@@ -126,6 +150,7 @@ class VisualCanvas(Model):
 
         Todo:
             * Rewrite to more efficiently handle type issues.
+            * Try to just handle tuples better
         """
         type_correct = False
         if type(coordinates) is not list:
@@ -166,7 +191,7 @@ class VisualCanvas(Model):
 
     def choose_initial_cell(self, first_cell_algorithm='centre'):
         """Select first cell based on canvas_type and first_cell_algorithm."""
-        if not self.grid_length and not self.is_torus:
+        if self.new_cells_allowed:
             return self.visual_cells.create(x_position=0, y_position=0)
         else:
             coords = getattr(
@@ -204,7 +229,8 @@ class VisualCanvas(Model):
             artist__isnull=True).values_list('x_position', 'y_position'))
         if not allocated_cells:
             return self.choose_initial_cell(first_cell_algorithm)
-        if self.grid_length and len(allocated_cells) is self.grid_length**2:
+        if (self.is_grid and
+                len(allocated_cells) >= self.grid_length*self.grid_width):
             raise self.FullGridException
         COORDINATE_DIFFERENCES = list(CELL_ADJACENTS.values())
         shuffle(allocated_cells)
@@ -214,7 +240,7 @@ class VisualCanvas(Model):
                 potential_cell = (cell[0] + coordinate_difference[0],
                                   cell[1] + coordinate_difference[1])
                 if potential_cell not in allocated_cells:  # Might choose a pre-allocated cell
-                    if not self.grid_length:
+                    if self.new_cells_allowed:
                         return VisualCell(x_position=potential_cell[0],
                                           y_position=potential_cell[1],
                                           canvas=self)
@@ -224,7 +250,7 @@ class VisualCanvas(Model):
                         if potential_cell in allocated_cells:
                             continue
                     else:  # Grid but not torus
-                        if (not 0 <= potential_cell[0] < self.grid_length or
+                        if (not 0 <= potential_cell[0] < self.grid_width or
                                 not 0 <= potential_cell[1] < self.grid_length):
                             continue
                     try:
@@ -254,6 +280,11 @@ class VisualCanvas(Model):
             # if self.grid_length:
             #     self.generate_grid()
             #     # self.initiate_torus_links()
+        if bool(self.grid_width) ^ bool(self.grid_length):  # NOR len or width
+            if not bool(self.grid_width):  # Not grid_length should then be set
+                self.grid_width = 1
+            else:
+                self.grid_length = 1       # Not grid_width implied by `if`
         super().save(*args, **kwargs)
 
 
@@ -290,8 +321,10 @@ class VisualCell(Model):
     artist = ForeignKey(AUTH_USER_MODEL, null=True, blank=True,
                         on_delete=SET_NULL, related_name='visual_cells',
                         verbose_name=_("Artist for this Part of the Canvas"),)
-    y_position = IntegerField()
-    x_position = IntegerField()
+    x_position = IntegerField(_("Horizontal position relative to 0"))
+    y_position = IntegerField(_("Veritical position relative to 0"))
+    is_editable = BooleanField(_("Whether artists are allowed to edit this "
+                                 "cell."), default=True)
 
     class Meta:
 
@@ -303,7 +336,7 @@ class VisualCell(Model):
     def clean(self):
         """Means of testing if cell is outside a pre-defined grid."""
         if (self.canvas.grid_length and
-                not self.canvas.grid_length > self.x_position >= 0 or
+                not self.canvas.grid_width > self.x_position >= 0 or
                 not self.canvas.grid_length > self.y_position >= 0):
             raise ValidationError(_(f'Cell position {self.coordinates} is '
                                     'outside the grid'))

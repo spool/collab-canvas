@@ -70,6 +70,7 @@ class TestCreatingTorusGrid(BaseVisualTest):
             start_time=timezone.now(),
             end_time=timezone.now() + timedelta(seconds=20),
             grid_length=3,
+            grid_width=3,
             creator=self.super_user,
             is_torus=True
         )
@@ -104,6 +105,7 @@ class TestTorusGridUsage(BaseVisualTest):
             start_time=timezone.now(),
             end_time=timezone.now() + timedelta(minutes=20),
             grid_length=3,
+            grid_width=3,
             creator=self.super_user,
             is_torus=True
         )
@@ -215,6 +217,7 @@ class TestNonTorusGrid(BaseVisualTest):
             start_time=timezone.now(),
             end_time=timezone.now() + timedelta(seconds=600),
             grid_length=2,
+            grid_width=2,
             creator=self.super_user,
             is_torus=False
         )

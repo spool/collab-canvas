@@ -4,7 +4,7 @@ from random import seed
 
 from django.utils import timezone
 
-from ..models import VisualCanvas  # , CELL_NEIGHBOURS
+from ..models import VisualCanvas
 from .utils import BaseVisualTest
 from collab_canvas.users.models import User
 

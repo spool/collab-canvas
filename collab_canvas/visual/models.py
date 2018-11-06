@@ -54,7 +54,7 @@ class VisualCanvas(Model):
 
     Todo:
         * Consider more flexible canvas shapes
-        * Consider at least allowing x/y height and width
+        * Consider at least allowing x/y width and height
         * Possibility of resizing canvas and making dynamic in future
     """
 
@@ -86,7 +86,7 @@ class VisualCanvas(Model):
     @property
     def is_grid(self):
         """Test if both grid_width and grid_height are > 0."""
-        return self.grid_width > 0 and self.grid_height > 0
+        return 0 < self.grid_width and 0 < self.grid_height
 
     def clean(self):
         if self.is_torus and self.new_cells_allowed:
@@ -96,12 +96,13 @@ class VisualCanvas(Model):
             raise ValidationError(_('Torus VisualCanvases must have a height'))
 
     def generate_grid(self, add=False):
-        """Generate a torus grid."""
-        if self.is_grid and self.visual_cells.count() == 0:
+        """Generate a grid."""
+        cell_count = self.visual_cells.count()
+        if self.is_grid and cell_count == 0:
             for x in range(self.grid_width):
                 for y in range(self.grid_height):
                     self.visual_cells.create(x_position=x, y_position=y)
-        elif self.is_grid and add:
+        elif self.is_grid and add and not self.is_torus:
             try:
                 current_max_x, current_max_y = self.visual_cells.aggregate(
                     Max('x_position'), Max('y_position')).values()
@@ -118,14 +119,17 @@ class VisualCanvas(Model):
                 for y in range(self.grid_height):
                     if x > current_max_x or y > current_max_y:
                         self.visual_cells.create(x_position=x, y_position=y)
-        elif not add:
+        elif not add and not self.is_torus:
             raise ValidationError(_("Cells can only be added to a grid if "
                                     "add=True"))
+        elif self.is_torus and cell_count > 0:
+            raise ValidationError(_("Cells cannot be added to a torus that "
+                                    f"already has {cell_count} cells"))
 
     @property
     def max_coordinates(self):
         """
-        Maximum point for torus grid.
+        Maximum point for a grid.
 
         Note:
             * Implemented in case of future non-square (use grid_width if so).

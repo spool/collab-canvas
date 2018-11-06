@@ -79,6 +79,13 @@ class TestCreatingTorusGrid(BaseVisualTest):
             with self.subTest(cell=cell):
                 self.assertEqual(cell.get_neighbours(as_tuple=True),
                                  CORRECT_CELL_NEIGHBOURS[cell.coordinates])
+        with self.subTest("Try altering the height of the canvas."):
+            canvas.grid_height = 4
+            with transaction.atomic():
+                with self.assertRaises(ValidationError) as error:
+                    canvas.generate_grid(add=True)
+                self.assertIn("Cells cannot be added to a torus that already "
+                              "has 9 cells", str(error.exception))
 
     @skip("Not yet implemented")
     def test_creating_2x2_torus(self):

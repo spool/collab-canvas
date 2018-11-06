@@ -69,7 +69,7 @@ class TestCreatingTorusGrid(BaseVisualTest):
             title='Test Torus',
             start_time=timezone.now(),
             end_time=timezone.now() + timedelta(seconds=20),
-            grid_length=3,
+            grid_height=3,
             grid_width=3,
             creator=self.super_user,
             is_torus=True
@@ -104,7 +104,7 @@ class TestTorusGridUsage(BaseVisualTest):
             title='Test Editing Torus',
             start_time=timezone.now(),
             end_time=timezone.now() + timedelta(minutes=20),
-            grid_length=3,
+            grid_height=3,
             grid_width=3,
             creator=self.super_user,
             is_torus=True
@@ -216,7 +216,7 @@ class TestNonTorusGrid(BaseVisualTest):
             title='Test Non-Torus Grid',
             start_time=timezone.now(),
             end_time=timezone.now() + timedelta(seconds=600),
-            grid_length=2,
+            grid_height=2,
             grid_width=2,
             creator=self.super_user,
             is_torus=False
@@ -324,13 +324,46 @@ class TestNonTorusGrid(BaseVisualTest):
                 self.assertIn('Cell position (-1, -1) is outside the grid',
                               str(error.exception))
 
+    def test_modifying_width_and_height(self):
+        """Test adding width and height and failures."""
+        with self.subTest("Demonstrate failure in changing width without "
+                          "add=True"):
+            self.canvas.grid_width = 3
+            with transaction.atomic():
+                with self.assertRaises(ValidationError) as error:
+                    self.canvas.generate_grid()
+                self.assertIn("Cells can only be added to a grid if "
+                              "add=True",
+                              str(error.exception))
+        with self.subTest("Demonstrate correct width increase with add=True"):
+            with transaction.atomic():
+                self.canvas.generate_grid(add=True)
+                self.assertEqual(self.canvas.max_coordinates, (2, 1))
+                self.assertEqual(self.canvas.visual_cells.count(), 6)
+        with self.subTest("Demonstrate correct heigh increase with add=True"):
+            self.canvas.grid_height = 4
+            with transaction.atomic():
+                self.canvas.generate_grid(add=True)
+                self.assertEqual(self.canvas.max_coordinates, (2, 3))
+                self.assertEqual(self.canvas.visual_cells.count(), 12)
+        with self.subTest("Raise error if trying to reduce height."):
+            self.canvas.grid_height = 2
+            with transaction.atomic():
+                with self.assertRaises(ValidationError) as error:
+                    self.canvas.generate_grid(add=True)
+                self.assertIn("Cannot add to grid unless both previous "
+                              "grid max_coordinates (2, 3) are < "
+                              "set max_coordinates (2, 1) for canvas "
+                              "Test Non-Torus Grid",
+                              str(error.exception))
+
     # def test_creating_grid_permission(self):
     #     try:
     #         canvas = VisualCanvas.objects.create(
     #             title='Test Canvas',
     #             start_time=datetime.now(),
     #             end_time=datetime.now() + timedelta(seconds=20),
-    #             grid_length=2,
+    #             grid_height=2,
     #             creator=self.user,
     #             is_torus=True
     #         )

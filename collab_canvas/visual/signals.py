@@ -6,8 +6,11 @@ from .models import VisualCanvas, VisualCell
 
 @receiver(post_save, sender=VisualCanvas)
 def initialize_canvas(sender, **kwargs):
-    """Initiate VisualCells if canvas grid_length is set."""
-    if kwargs['created'] and kwargs['instance'].grid_length:
+    """
+    Initiate VisualCells if canvas grid_width or grid_height are set > 0.
+    """
+    if kwargs['created'] and (kwargs['instance'].grid_width or
+                              kwargs['instance'].grid_height):
         kwargs['instance'].generate_grid()
 
 

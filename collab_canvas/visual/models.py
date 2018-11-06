@@ -10,7 +10,7 @@ from config.settings.base import AUTH_USER_MODEL
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import ValidationError
 from django.db.models import (CASCADE, SET_NULL, CharField, BooleanField,
-                              DateTimeField, ForeignKey, Model,
+                              DateTimeField, ForeignKey, Max, Model,
                               PositiveSmallIntegerField, IntegerField,
                               SlugField, TextField)
 from django.utils.text import slugify
@@ -46,14 +46,15 @@ class VisualCanvas(Model):
     Canvas for visual collaboration.
 
     Each canvas has a start and end date, and normal users may only edit one
-    cell. If a torus then a grid length must be defined. If not a torus then a
-    grid_length will enforce the maximum edges but not connect edge neighbours.
-    If grid length is not defined then the canvas will grow with positive and
+    cell. If a torus then the grid height and width must be defined. If not a
+    torus then grid_width and grid_height will enforce the maximum edges but
+    not connect edge neighbours. If grid height and width are 0 and
+    new_cell_allowed is True then the canvas will grow with positive and
     negative coordinates organically with each new artist.
 
     Todo:
         * Consider more flexible canvas shapes
-        * Consider at least allowing x/y length
+        * Consider at least allowing x/y height and width
         * Possibility of resizing canvas and making dynamic in future
     """
 
@@ -64,9 +65,9 @@ class VisualCanvas(Model):
     end_time = DateTimeField(_("Time the Canvas Will Stop Accepting Edits"))
     grid_width = PositiveSmallIntegerField(
         _("Grid horizontal (x) length, where max number of cells is this "
-          "times grid_length."),
+          "times grid_height."),
         default=8,)  # Default assumes a square grid
-    grid_length = PositiveSmallIntegerField(
+    grid_height = PositiveSmallIntegerField(
         _("Grid vertical (y) length, where max number of cells is this "
           "time grid_width."),
         default=8,)  # Default assumes a square grid
@@ -84,21 +85,42 @@ class VisualCanvas(Model):
 
     @property
     def is_grid(self):
-        """Test if both grid_with and grid_length are > 0."""
-        return self.grid_width > 0 and self.grid_length > 0
+        """Test if both grid_width and grid_height are > 0."""
+        return self.grid_width > 0 and self.grid_height > 0
 
     def clean(self):
         if self.is_torus and self.new_cells_allowed:
             raise ValidationError(_('Torus VisualCanvases cannot add '
                                     'new cells.'))
         if self.is_torus and not self.is_grid:
-            raise ValidationError(_('Torus VisualCanvases must have a length'))
+            raise ValidationError(_('Torus VisualCanvases must have a height'))
 
-    def generate_grid(self):
+    def generate_grid(self, add=False):
         """Generate a torus grid."""
-        for x in range(self.grid_width):
-            for y in range(self.grid_length):
-                self.visual_cells.create(x_position=x, y_position=y)
+        if self.is_grid and self.visual_cells.count() == 0:
+            for x in range(self.grid_width):
+                for y in range(self.grid_height):
+                    self.visual_cells.create(x_position=x, y_position=y)
+        elif self.is_grid and add:
+            try:
+                current_max_x, current_max_y = self.visual_cells.aggregate(
+                    Max('x_position'), Max('y_position')).values()
+                assert (current_max_x < self.max_coordinates[0] or
+                        current_max_y < self.max_coordinates[1])
+            except AssertionError:
+                raise ValidationError(_("Cannot add to grid unless both "
+                                        f"previous grid max_coordinates "
+                                        f"({current_max_x}, {current_max_y}) "
+                                        "are < set max_coordinates "
+                                        f"{self.max_coordinates} for canvas "
+                                        f"{self.title}"))
+            for x in range(self.grid_width):
+                for y in range(self.grid_height):
+                    if x > current_max_x or y > current_max_y:
+                        self.visual_cells.create(x_position=x, y_position=y)
+        elif not add:
+            raise ValidationError(_("Cells can only be added to a grid if "
+                                    "add=True"))
 
     @property
     def max_coordinates(self):
@@ -109,9 +131,9 @@ class VisualCanvas(Model):
             * Implemented in case of future non-square (use grid_width if so).
         """
         if not self.is_grid:
-            raise ValidationError(_('Max of coordinates requires a defined'
+            raise ValidationError(_('Max of coordinates requires a defined '
                                     'grid'))
-        return (self.grid_width - 1, self.grid_length - 1)
+        return (self.grid_width - 1, self.grid_height - 1)
 
     def get_centre_cell_coordinates(self):
         """
@@ -146,7 +168,7 @@ class VisualCanvas(Model):
         Enforce coordinates for a torus grid.
 
         This method projects negative coordinates to positive ones. Requires
-        a torus of length >= 3.
+        a torus of height >= 3.
 
         Todo:
             * Rewrite to more efficiently handle type issues.
@@ -230,7 +252,7 @@ class VisualCanvas(Model):
         if not allocated_cells:
             return self.choose_initial_cell(first_cell_algorithm)
         if (self.is_grid and
-                len(allocated_cells) >= self.grid_length*self.grid_width):
+                len(allocated_cells) >= self.grid_height*self.grid_width):
             raise self.FullGridException
         COORDINATE_DIFFERENCES = list(CELL_ADJACENTS.values())
         shuffle(allocated_cells)
@@ -251,7 +273,7 @@ class VisualCanvas(Model):
                             continue
                     else:  # Grid but not torus
                         if (not 0 <= potential_cell[0] < self.grid_width or
-                                not 0 <= potential_cell[1] < self.grid_length):
+                                not 0 <= potential_cell[1] < self.grid_height):
                             continue
                     try:
                         blank_cell = self.visual_cells.get(
@@ -277,14 +299,14 @@ class VisualCanvas(Model):
         """
         if not self.id:
             self.slug = slugify(self.title)
-            # if self.grid_length:
+            # if self.grid_height:
             #     self.generate_grid()
             #     # self.initiate_torus_links()
-        if bool(self.grid_width) ^ bool(self.grid_length):  # NOR len or width
-            if not bool(self.grid_width):  # Not grid_length should then be set
+        if bool(self.grid_width) ^ bool(self.grid_height):  # NOR len or width
+            if not bool(self.grid_width):  # Not grid_height should then be set
                 self.grid_width = 1
             else:
-                self.grid_length = 1       # Not grid_width implied by `if`
+                self.grid_height = 1       # Not grid_width implied by `if`
         super().save(*args, **kwargs)
 
 
@@ -335,9 +357,9 @@ class VisualCell(Model):
 
     def clean(self):
         """Means of testing if cell is outside a pre-defined grid."""
-        if (self.canvas.grid_length and
+        if (self.canvas.grid_height and
                 not self.canvas.grid_width > self.x_position >= 0 or
-                not self.canvas.grid_length > self.y_position >= 0):
+                not self.canvas.grid_height > self.y_position >= 0):
             raise ValidationError(_(f'Cell position {self.coordinates} is '
                                     'outside the grid'))
 

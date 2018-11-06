@@ -27,7 +27,7 @@ class TestGeneratingEmptyCanvas(BaseVisualTest):
             title='Test Dynamic Canvas',
             start_time=timezone.now(),
             end_time=timezone.now() + timedelta(seconds=20),
-            grid_length=0,
+            grid_height=0,
             grid_width=0,
             creator=self.super_user,
             is_torus=False,

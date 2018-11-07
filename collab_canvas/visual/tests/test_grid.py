@@ -79,7 +79,7 @@ class TestCreatingTorusGrid(BaseVisualTest):
             with self.subTest(cell=cell):
                 self.assertEqual(cell.get_neighbours(as_tuple=True),
                                  CORRECT_CELL_NEIGHBOURS[cell.coordinates])
-        with self.subTest("Try altering the height of the canvas."):
+        with self.subTest("Test invalidly altering the height of the canvas."):
             canvas.grid_height = 4
             with transaction.atomic():
                 with self.assertRaises(ValidationError) as error:
@@ -87,10 +87,22 @@ class TestCreatingTorusGrid(BaseVisualTest):
                 self.assertIn("Cells cannot be added to a torus that already "
                               "has 9 cells", str(error.exception))
 
-    @skip("Not yet implemented")
     def test_creating_2x2_torus(self):
         """Test creating a 2x2 torus."""
-        pass
+        with transaction.atomic():
+            with self.assertRaises(ValidationError) as error:
+                canvas = VisualCanvas.objects.create(
+                    title='Test Creation Fail',
+                    start_time=timezone.now(),
+                    end_time=timezone.now() + timedelta(minutes=3),
+                    grid_width=2,
+                    grid_height=2,
+                    creator=self.super_user,
+                    is_torus=True,
+                )
+                canvas.save()
+            self.assertIn('Width 2 < 3 and/or length 2 < 3',
+                          str(error.exception))
 
     @skip("Not yet implemented")
     def test_creating_1x1_torus(self):
@@ -228,6 +240,15 @@ class TestNonTorusGrid(BaseVisualTest):
             creator=self.super_user,
             is_torus=False
         )
+
+    def test_invalid_star_end_times(self):
+        """Setting an end_time < start_time cannot be saved."""
+        self.canvas.end_time = self.canvas.start_time - timedelta(seconds=10)
+        with self.assertRaises(ValidationError) as error:
+            self.canvas.save()
+        self.assertIn((f'start_time {self.canvas.start_time} must be earlier '
+                       f'than end_time {self.canvas.end_time}'),
+                      str(error.exception))
 
     def test_non_torus_grid(self):
         """Test creation a non-grid canvas."""

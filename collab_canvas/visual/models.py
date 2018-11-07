@@ -110,7 +110,7 @@ class VisualCanvas(Model):
                         current_max_y < self.max_coordinates[1])
             except AssertionError:
                 raise ValidationError(_("Cannot add to grid unless both "
-                                        f"previous grid max_coordinates "
+                                        "previous grid max_coordinates "
                                         f"({current_max_x}, {current_max_y}) "
                                         "are < set max_coordinates "
                                         f"{self.max_coordinates} for canvas "
@@ -311,6 +311,17 @@ class VisualCanvas(Model):
                 self.grid_width = 1
             else:
                 self.grid_height = 1       # Not grid_width implied by `if`
+        if self.is_torus:
+            try:
+                assert 2 < self.grid_width and 2 < self.grid_height
+            except AssertionError:
+                raise ValidationError(_(f'Width {self.grid_width} < 3 and/or '
+                                        f'length {self.grid_height} < 3'))
+        try:
+            assert self.start_time < self.end_time
+        except AssertionError:
+            raise ValidationError(_(f'start_time {self.start_time} must be earlier '
+                                    f'than end_time {self.end_time}'))
         super().save(*args, **kwargs)
 
 

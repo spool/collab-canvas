@@ -93,7 +93,8 @@ class VisualCanvas(Model):
             raise ValidationError(_('Torus VisualCanvases cannot add '
                                     'new cells.'))
         if self.is_torus and not self.is_grid:
-            raise ValidationError(_('Torus VisualCanvases must have a height'))
+            raise ValidationError(_(f'Torus {self} must  have a width and '
+                                    'height'))
 
     def generate_grid(self, add=False):
         """Generate a grid."""
@@ -215,7 +216,7 @@ class VisualCanvas(Model):
         'random': 'get_random_cell_coordinates',
     }
 
-    def choose_initial_cell(self, first_cell_algorithm='centre'):
+    def choose_initial_cell(self, first_cell_algorithm: str = 'centre'):
         """Select first cell based on canvas_type and first_cell_algorithm."""
         if self.new_cells_allowed:
             return self.visual_cells.create(x_position=0, y_position=0)
@@ -225,7 +226,8 @@ class VisualCanvas(Model):
             return self.visual_cells.get(x_position=coords[0],
                                          y_position=coords[1])
 
-    def get_or_create_contiguous_cell(self, first_cell_algorithm='centre'):
+    def get_or_create_contiguous_cell(self,
+                                      first_cell_algorithm: str = 'centre'):
         """
         Find a continguous cell that's not owned
 
@@ -426,7 +428,7 @@ class VisualCell(Model):
                                edges_south_east=blank_list,
                                edges_south_west=blank_list)
 
-    def get_neighbours(self, as_tuple=False):
+    def get_neighbours(self, as_tuple: bool = False):
         """
         Return Moore's neighbours, including torus neighbours if appropriate.
         """

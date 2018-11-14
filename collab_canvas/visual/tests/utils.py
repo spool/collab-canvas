@@ -1,3 +1,5 @@
+from random import seed
+
 import pytest
 
 from django.core import serializers
@@ -11,6 +13,8 @@ from collab_canvas.users.models import User
 class BaseVisualTest(TestCase):
 
     """Base inheritable class to cover atomic tests with canvas creation."""
+
+    BASE_SEED = seed(3141592)
 
     def setUp(self):
         self.super_user = User.objects.create_superuser(username="test_super",

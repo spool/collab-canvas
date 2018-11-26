@@ -1,15 +1,4 @@
-from datetime import timedelta
-
-from random import seed
-
-from django.utils import timezone
-
-from ..models import VisualCanvas
-from .utils import BaseVisualTest
-from collab_canvas.users.models import User
-
-
-seed(3141592)
+from .utils import BaseVisualTest, CanvasFactory, UserFactory
 
 
 class TestGeneratingEmptyCanvas(BaseVisualTest):
@@ -23,16 +12,11 @@ class TestGeneratingEmptyCanvas(BaseVisualTest):
     def setUp(self):
         """Test creating a non-grid canvas."""
         super().setUp()
-        self.canvas = VisualCanvas.objects.create(
+        self.canvas = CanvasFactory(
             title='Test Dynamic Canvas',
-            start_time=timezone.now(),
-            end_time=timezone.now() + timedelta(seconds=20),
             grid_height=0,
             grid_width=0,
-            creator=self.super_user,
-            is_torus=False,
-            new_cells_allowed=True,
-        )
+            new_cells_allowed=True)
 
     def test_unique_cell_per_canvas(self):
         """Test that duplicate cells cannot be added to a canvas."""
@@ -69,11 +53,7 @@ class TestGeneratingEmptyCanvas(BaseVisualTest):
                      'south': (1, -1), 'south_west': (0, -1),
                      'west': (0, 0), 'north_west': None},
         }
-        users = [
-            User.objects.create(username=f'test{i}', email=f'test{1}@test.com',
-                                password=f'test{i}')
-            for i in range(5)
-        ]
+        users = [UserFactory() for i in range(5)]
         for user in users:
             cell = self.canvas.get_or_create_contiguous_cell()
             cell.artist = user

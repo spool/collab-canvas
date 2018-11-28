@@ -1,7 +1,5 @@
 from datetime import timedelta
 
-from django.utils import timezone
-
 from factory import LazyAttribute, LazyFunction, Sequence, SubFactory
 from factory.django import DjangoModelFactory
 
@@ -10,14 +8,11 @@ import pytest
 from random import seed
 
 from django.core import serializers
-from django.contrib.auth.models import AnonymousUser
-from django.test import TestCase, RequestFactory
+from django.test import TestCase
+from django.utils import timezone
 
 from collab_canvas.users.models import User
 from collab_canvas.visual.models import VisualCanvas
-
-
-BASE_SEED = seed(3141592)
 
 
 class SuperUser(DjangoModelFactory):
@@ -80,17 +75,14 @@ class BaseVisualTest(TestCase):
         seed(3141592)
 
 
-@pytest.mark.django_db
-class BaseTransactionVisualTest(TestCase):
-
-    """Base inheritable class which can also handle transactions/rollbacks."""
-
-    def setUp(self):
-        self.super_user = User.objects.create_superuser(username="test_super",
-                                                        email="test@test.com",
-                                                        password="secret")
-        self.anonymous_user = AnonymousUser()
-        self.requests = RequestFactory
+# @pytest.mark.django_db
+# class BaseTransactionVisualTest(TestCase):
+#
+#     """Base inheritable class which can also handle transactions/rollbacks."""
+#
+#     def setUp(self):
+#         self.anonymous_user = AnonymousUser()
+#         self.requests = RequestFactory
 
 
 def dump_data(query_sets, file_format="json", indent=2):

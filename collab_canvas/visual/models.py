@@ -26,6 +26,7 @@ CELL_ADJACENTS = {
     'west': (-1, 0),
 }
 
+
 CELL_CORNERS = {
     'north_east': (1, 1),
     'south_east': (1, -1),

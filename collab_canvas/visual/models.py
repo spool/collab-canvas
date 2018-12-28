@@ -9,14 +9,16 @@ from config.settings.base import AUTH_USER_MODEL
 
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import ValidationError
-from django.db.models import (CASCADE, SET_NULL, CharField, BooleanField,
-                              DateTimeField, ForeignKey, Max, Model,
-                              PositiveSmallIntegerField, IntegerField,
-                              SlugField, TextField)
+from django.db.models import (CASCADE, SET_NULL, BigAutoField, CharField,
+                              BooleanField, DateTimeField, ForeignKey, Max,
+                              Model, PositiveSmallIntegerField, IntegerField,
+                              SlugField, TextField, UUIDField)
+from django.urls import reverse
 from django.utils.text import slugify
 from django.utils.translation import ugettext_lazy as _
 
 from random import shuffle, choice
+from uuid import uuid4
 
 
 CELL_ADJACENTS = {
@@ -57,8 +59,12 @@ class VisualCanvas(Model):
         * Consider more flexible canvas shapes
         * Consider at least allowing x/y width and height
         * Possibility of resizing canvas and making dynamic in future
+        * Way of enforing cell_divisions to cells and edits
+        * Consider changing cell_divisions to widith and height
     """
 
+    id = UUIDField(verbose_name='ID', default=uuid4, primary_key=True,
+                   editable=False)
     title = CharField(_("Canvas Title"), max_length=100)
     slug = SlugField(_("URL Compliant Title"), unique=True)
     description = TextField(max_length=200, blank=True)
@@ -327,6 +333,14 @@ class VisualCanvas(Model):
                                     f'than end_time {self.end_time}'))
         super().save(*args, **kwargs)
 
+    def get_absolute_url(self):
+        """
+        return reverse("users:detail", kwargs={"username": self.username})
+
+        Sort UUIDs for canvases. Cell coordinates are urls.
+        """
+        return reverse('canvas', kwargs={'canvas_id': self.id})
+
 
 # class TorusEdgeCellsManager(Manager):
 #
@@ -353,8 +367,16 @@ class VisualCanvas(Model):
 
 class VisualCell(Model):
 
-    """A cell in a VisualCanvas."""
+    """
+    A cell in a VisualCanvas.
 
+    Todo:
+        * Consider an automatic null initial cell
+        * Consider enforcing Cell Dimensions (and potential flexibility).
+    """
+
+    id = UUIDField(verbose_name='ID', default=uuid4, primary_key=True,
+                   editable=False)
     canvas = ForeignKey(VisualCanvas, on_delete=CASCADE,
                         related_name='visual_cells',
                         verbose_name=_("Canvas Cell is Associated With"))
@@ -412,6 +434,11 @@ class VisualCell(Model):
     # edge_cells = EdgeCellsManager()
     # torus_edge_cells = TorusEdgeCellsManager()
 
+    def get_absolute_url(self):
+        """Canvas url and uuid to retain anonymity in cell position."""
+        return reverse('cell', kwargs={'canvas_id': self.canvas.id,
+                                       'cell_id': self.id})
+
     def __str__(self):
         return (
             f'({self.x_position}, {self.y_position}) '
@@ -424,10 +451,10 @@ class VisualCell(Model):
 
     def set_blank(self):
         blank_list = self.default_blank_list()
-        self.cell_edits.create(edges_horizontal=blank_list,
-                               edges_vertical=blank_list,
-                               edges_south_east=blank_list,
-                               edges_south_west=blank_list)
+        self.edits.create(edges_horizontal=blank_list,
+                          edges_vertical=blank_list,
+                          edges_south_east=blank_list,
+                          edges_south_west=blank_list)
 
     def get_neighbours(self, as_tuple: bool = False):
         """
@@ -450,6 +477,11 @@ class VisualCell(Model):
                 neighbours[direction] = neighbour
         return neighbours
 
+    @property
+    def edit_ids(self):
+        """List of edits."""
+        return list(self.edits.values_list('id', flat=True))
+
     # def set_neighbours(self):
     #     for direction, coordinates in CELL_NEIGHBOURS.items():
     #         try:
@@ -461,15 +493,28 @@ class VisualCell(Model):
 
     # def save(self, *args, **kwargs):
     #     if not self.id:
-    #         self.cell_edits = [self.blank_cell()]
+    #         self.edits = [self.blank_cell()]
     #     super().save(*args, **kwargs)
 
 
 class VisualCellEdit(Model):
 
-    """Timestamped edits to cells."""
+    """
+    Timestamped edits to cells.
 
-    cell = ForeignKey(VisualCell, on_delete=CASCADE, related_name="cell_edits")
+    Todo:
+        * Decide if it's worth including a hidden option here and Cell (in case
+        of time series reveal). Could be questions of who it's hidden for...
+        * Decide if a boolean 'submit' (or similar) is worth including to
+        indicate artist's sense of "completion"
+        * Whether it's worth marking with comments
+        * Whether a sequence number is worth saving
+        * How to mark issues or skips in time series
+        * See if it's worth adding ordering to Meta
+        * See if the order_with_respect_to is worth it...
+    """
+    id = BigAutoField(primary_key=True)
+    cell = ForeignKey(VisualCell, on_delete=CASCADE, related_name="edits")
     timestamp = DateTimeField(auto_now=True)
     edges_horizontal = ArrayField(PositiveSmallIntegerField())
     edges_vertical = ArrayField(PositiveSmallIntegerField())
@@ -477,5 +522,26 @@ class VisualCellEdit(Model):
     edges_south_west = ArrayField(PositiveSmallIntegerField())
 
     def __str__(self):
-        state = f'self.cell.artist ' if self.cell.artist else 'Empty '
-        return state + f'timestamp'
+        """
+        Artist (if specified) and timestamp
+
+        Todo:
+            * Fix this!
+        """
+        state = f'{self.cell.artist} ' if self.cell.artist else 'Empty '
+        return state + f'{self.timestamp}'
+
+    def get_absolute_url(self):
+        """Using Canvas and Cell uuids to be able to reconstruct ordering."""
+        return reverse('cell-edit', kwargs={'canvas_id': self.cell.canvas.id,
+                                            'cell_id': self.cell.id,
+                                            'edit_number': self.edit_number})
+
+    @property
+    def edit_number(self):
+        """Return what number edit this is of its cell."""
+        return self.cell.edit_ids.index(self.id)  # index finds first match in list
+
+    class Meta:
+        order_with_respect_to = 'cell'
+        # ordering = ('cell', 'timestamp')

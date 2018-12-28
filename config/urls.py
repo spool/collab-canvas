@@ -21,15 +21,9 @@ urlpatterns = [
     ),
     path("accounts/", include("allauth.urls")),
     # Your stuff: custom urls includes go here
-
     path(
-        "canvas/visual/", include("collab_canvas.visual.urls"),
+        "visual/", include("collab_canvas.visual.urls", namespace="visual"),
     ),
-    # path(
-    #     "visual_canvas/",
-    #     TemplateView.as_view(template_name="pages/visual_canvas.html"),
-    #     name="visual_canvas",
-    # ),
 ] + static(
     settings.MEDIA_URL, document_root=settings.MEDIA_ROOT
 )
@@ -38,6 +32,12 @@ if settings.DEBUG:
     # This allows the error pages to be debugged during development, just visit
     # these url in browser to see how these error pages look like.
     urlpatterns += [
+        # For testing p5js UI
+        path(
+            "test_canvas/",
+            TemplateView.as_view(template_name="pages/visual_canvas.html"),
+            name="test_visual_canvas",
+        ),
         path(
             "400/",
             default_views.bad_request,

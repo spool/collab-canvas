@@ -1,13 +1,9 @@
 from .utils import BaseVisualTest, CanvasFactory, UserFactory
 
 
-class TestGeneratingEmptyCanvas(BaseVisualTest):
+class BaseDynamicCanvasTest(BaseVisualTest):
 
-    """
-    Test generating a grid that isn't a torus.
-
-    Crucially, these edge cells never have a full grid of neighbours.
-    """
+    """Simple base class for all DynamicCanvas tests."""
 
     def setUp(self):
         """Test creating a non-grid canvas."""
@@ -17,6 +13,15 @@ class TestGeneratingEmptyCanvas(BaseVisualTest):
             grid_height=0,
             grid_width=0,
             new_cells_allowed=True)
+
+
+class TestGeneratingEmptyCanvas(BaseDynamicCanvasTest):
+
+    """
+    Test generating a grid that isn't a torus.
+
+    Crucially, these edge cells never have a full grid of neighbours.
+    """
 
     def test_unique_cell_per_canvas(self):
         """Test that duplicate cells cannot be added to a canvas."""

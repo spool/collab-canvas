@@ -62,9 +62,7 @@ class VisualCanvas(Model):
         * Way of enforing cell_divisions to cells and edits
         * Consider changing cell_divisions to widith and height
     """
-
-    id = UUIDField(verbose_name='ID', default=uuid4, primary_key=True,
-                   editable=False)
+    id = UUIDField(default=uuid4, primary_key=True, editable=False)
     title = CharField(_("Canvas Title"), max_length=100)
     slug = SlugField(_("URL Compliant Title"), unique=True)
     description = TextField(max_length=200, blank=True)
@@ -78,7 +76,13 @@ class VisualCanvas(Model):
         _("Grid vertical (y) length, where max number of cells is this "
           "time grid_width."),
         default=8,)  # Default assumes a square grid
-    cell_divisions = PositiveSmallIntegerField(_("Cell Divisions"), default=8)
+    # cell_divisions = PositiveSmallIntegerField(_("Cell Divisions"), default=8)
+    # There's a possibilty for a 3rd dimension in future if helpful
+    cell_width = PositiveSmallIntegerField(_("Width of cell grid "
+                                             "(defaults to 8x8 grid)"), default=8)
+    cell_height = PositiveSmallIntegerField(_("Height of cell grid "
+                                              "(defaults to 8x8 grid)"), default=8)
+    # cell_type = PositiveSmallIntegerField("Diagonal")
     creator = ForeignKey(AUTH_USER_MODEL, on_delete=CASCADE,
                          verbose_name=_("Person who created this Visual "
                                         "Canvas"))
@@ -341,6 +345,13 @@ class VisualCanvas(Model):
         """
         return reverse('canvas', kwargs={'canvas_id': self.id})
 
+    def default_blank_cell(self):
+        return {'edges_horizontal': [0]*(self.cell_width**2 + self.cell_width),
+                'edges_vertical': [0]*(self.cell_height**2 + self.cell_height),
+                'edges_south_east': [0]*self.cell_width*self.cell_height,
+                'edges_south_west': [0]*self.cell_width*self.cell_height,
+                }
+
 
 # class TorusEdgeCellsManager(Manager):
 #
@@ -373,10 +384,11 @@ class VisualCell(Model):
     Todo:
         * Consider an automatic null initial cell
         * Consider enforcing Cell Dimensions (and potential flexibility).
+        * Random cell generator (remove from Grid contructor)
+        * Conside  adding description, or json or both
     """
 
-    id = UUIDField(verbose_name='ID', default=uuid4, primary_key=True,
-                   editable=False)
+    id = UUIDField(default=uuid4, primary_key=True, editable=False)
     canvas = ForeignKey(VisualCanvas, on_delete=CASCADE,
                         related_name='visual_cells',
                         verbose_name=_("Canvas Cell is Associated With"))
@@ -446,15 +458,16 @@ class VisualCell(Model):
             f'{self.artist.username if self.artist else "Not assigned"}'
         )
 
-    def default_blank_list(self):
-        return [0 for x in range(self.canvas.cell_divisions)]
+    @staticmethod
+    def default_blank_list(x):
+        return [0]*x
 
     def set_blank(self):
-        blank_list = self.default_blank_list()
-        self.edits.create(edges_horizontal=blank_list,
-                          edges_vertical=blank_list,
-                          edges_south_east=blank_list,
-                          edges_south_west=blank_list)
+        blank_cell_dict = self.canvas.default_blank_cell()
+        self.edits.create(edges_horizontal=blank_cell_dict['edges_horizontal'],
+                          edges_vertical=blank_cell_dict['edges_vertical'],
+                          edges_south_east=blank_cell_dict['edges_south_east'],
+                          edges_south_west=blank_cell_dict['edges_south_west'],)
 
     def get_neighbours(self, as_tuple: bool = False):
         """
@@ -482,6 +495,11 @@ class VisualCell(Model):
         """List of edits."""
         return list(self.edits.values_list('id', flat=True))
 
+    @property
+    def valid_edit_ids(self):
+        """List of valid edits."""
+        return list(self.edits.filter(is_valid=True).values_list('id',
+                                                                 flat=True))
     # def set_neighbours(self):
     #     for direction, coordinates in CELL_NEIGHBOURS.items():
     #         try:
@@ -516,10 +534,12 @@ class VisualCellEdit(Model):
     id = BigAutoField(primary_key=True)
     cell = ForeignKey(VisualCell, on_delete=CASCADE, related_name="edits")
     timestamp = DateTimeField(auto_now=True)
-    edges_horizontal = ArrayField(PositiveSmallIntegerField())
-    edges_vertical = ArrayField(PositiveSmallIntegerField())
-    edges_south_east = ArrayField(PositiveSmallIntegerField())
-    edges_south_west = ArrayField(PositiveSmallIntegerField())
+    edges_horizontal = ArrayField(PositiveSmallIntegerField(), db_column='x')
+    edges_vertical = ArrayField(PositiveSmallIntegerField(), db_column='y')
+    edges_south_east = ArrayField(PositiveSmallIntegerField(), db_column='z')
+    edges_south_west = ArrayField(PositiveSmallIntegerField(), db_column='t')
+    is_valid = BooleanField(_("Whether the edit is valid and included "
+                              "in time series"), default=True)
 
     def __str__(self):
         """
@@ -533,14 +553,22 @@ class VisualCellEdit(Model):
 
     def get_absolute_url(self):
         """Using Canvas and Cell uuids to be able to reconstruct ordering."""
-        return reverse('cell-edit', kwargs={'canvas_id': self.cell.canvas.id,
-                                            'cell_id': self.cell.id,
-                                            'edit_number': self.edit_number})
+        return reverse('cell-history', kwargs={'canvas_id': self.cell.canvas.id,
+                                               'cell_id': self.cell.id,
+                                               'edit_number': self.edit_number})
+
+    @property
+    def history_number(self):
+        """Return number in cell's history, irrespective of is_valid."""
+        return self.cell.edit_ids.index(self.id)  # index finds first match in list
 
     @property
     def edit_number(self):
         """Return what number edit this is of its cell."""
-        return self.cell.edit_ids.index(self.id)  # index finds first match in list
+        try:
+            return self.cell.valid_edit_ids.index(self.id)
+        except ValueError:  # cell has no edit number if not valid
+            return None
 
     class Meta:
         order_with_respect_to = 'cell'

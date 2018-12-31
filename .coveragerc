@@ -1,5 +1,5 @@
 [run]
 include = collab_canvas/*
-omit = *migrations*, *tests*
+omit = *migrations*, *tests*, *p5.*.js*
 plugins =
     django_coverage_plugin

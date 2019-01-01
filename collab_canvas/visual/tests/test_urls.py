@@ -2,7 +2,7 @@ from django.urls import reverse, resolve
 
 from ..models import VisualCellEdit
 from .test_dynamic import BaseDynamicCanvasTest
-from .utils import UserFactory
+from .utils import CanvasFactory, UserFactory
 
 
 class TestDynamicURLs(BaseDynamicCanvasTest):
@@ -38,6 +38,7 @@ class TestDynamicURLs(BaseDynamicCanvasTest):
         cell = self.canvas.get_or_create_contiguous_cell()
         cell.artist = user
         cell.save()
+
         edit1 = VisualCellEdit(edges_horizontal=[0, 1, 0, 0, 0, 0, 0, 0],
                                edges_vertical=[0, 0, 1, 0, 0, 0, 0, 0],
                                edges_south_east=[0, 0, 0, 0, 0, 0, 0, 0],
@@ -60,3 +61,12 @@ class TestDynamicURLs(BaseDynamicCanvasTest):
                     resolve(f'/visual/canvas/{self.canvas.id}/'
                             f'{user.id}/{edit.edit_number}/').view_name,
                     'visual:cell-edit')
+
+    # def test_cell_history_urls(self):
+    #     """Test history consistency even if some edits aren't valid."""
+    #     users = [UserFactory() for i in range(2)]
+    #     for u in users:
+    #         cell = self.canvas.get_or_create_contiguous_cell()
+    #         cell.artist = u
+    #         cell.save()
+        # canvases = [CanvasFactory() for c in 2]

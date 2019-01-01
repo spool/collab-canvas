@@ -12,12 +12,18 @@ from django.test import TestCase
 from django.utils import timezone
 
 from collab_canvas.users.models import User
-from collab_canvas.visual.models import VisualCanvas
+from collab_canvas.visual.models import VisualCanvas, VisualCell
 
 
 class SuperUser(DjangoModelFactory):
 
-    """Inherits from UserFactor to add Superuser privilages."""
+    """
+    Inherits from UserFactory to add Superuser privilages.
+
+    Todo:
+        * Ideally replace with just a finer grained user permission
+        * Consider https://github.com/django-guardian/django-guardian
+    """
 
     class Meta:
 
@@ -53,16 +59,44 @@ class CanvasFactory(DjangoModelFactory):
 
         model = VisualCanvas
         django_get_or_create = ('title', 'creator', 'is_torus',
-                                'new_cells_allowed')
+                                'new_cells_allowed', 'grid_width',
+                                'grid_height', 'cell_width', 'cell_height',)
 
     title = 'Test Non-Torus Grid'
     start_time = LazyFunction(timezone.now)
     end_time = LazyAttribute(lambda c: c.start_time + timedelta(seconds=600))
     grid_height = 2
     grid_width = 2
+    cell_width = 3
+    cell_height = 3
     creator = SubFactory(SuperUser)
     new_cells_allowed = False
     is_torus = False
+
+
+class CellFactory(DjangoModelFactory):
+
+    """Base Cell for (0, 0) to work with dynamic, grid and torus canvases."""
+
+    class Meta:
+
+        model = VisualCell
+        django_get_or_create = ('canvas', 'artist', 'x_position', 'y_position',
+                                'width', 'height', 'south_east_diagonals',
+                                'south_west_diagonals', 'colour_range',
+                                'is_editable', 'neighbours_may_edit')
+
+    canvas = SubFactory(CanvasFactory, grid_width=0, grid_height=0)
+    artist = SubFactory(UserFactory)
+    x_position = 0
+    y_position = 0
+    width = 3
+    height = 3
+    south_east_diagonals = 2
+    south_west_diagonals = 2
+    colour_range = 1
+    is_editable = True
+    neighbours_may_edit = True
 
 
 @pytest.mark.django_db

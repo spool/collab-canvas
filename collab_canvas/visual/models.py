@@ -4,6 +4,10 @@ growing.
 
 Todo:
     * See if the reciprocity of North<->South, East<->West is helpful.
+    * Add permissions at meta level of models
+    * Design a way of keeping track of edits in case reassignment is needed
+    * Possibility of generating random cells
+    * Rearrange default blank and random cells as cell methods
 """
 from config.settings.base import AUTH_USER_MODEL
 
@@ -19,6 +23,21 @@ from django.utils.translation import ugettext_lazy as _
 
 from random import shuffle, choice
 from uuid import uuid4
+
+
+DEFAULT_SQUARE_GRID_SIZE = 8
+DEFAULT_SQUARE_CELL_SIZE = 8
+DEFAULT_SQUARE_CELL_DIAGONAL_SIZE = DEFAULT_SQUARE_CELL_SIZE*2
+
+
+DEFAULT_GRID_PARANTHETICAL = (
+    "defaults to an {DEFAULT_SQUARE_GRID_SIZE}x{DEFAULT_SQUARE_GRID_SIZE} grid"
+)
+
+
+DEFAULT_CELL_PARANTHETICAL = (
+    "defaults to an {DEFAULT_SQUARE_CELL_SIZE}x{DEFAULT_SQUARE_CELL_SIZE} cell"
+)
 
 
 CELL_ADJACENTS = {
@@ -60,29 +79,33 @@ class VisualCanvas(Model):
         * Consider at least allowing x/y width and height
         * Possibility of resizing canvas and making dynamic in future
         * Way of enforing cell_divisions to cells and edits
-        * Consider changing cell_divisions to widith and height
     """
     id = UUIDField(default=uuid4, primary_key=True, editable=False)
     title = CharField(_("Canvas Title"), max_length=100)
     slug = SlugField(_("URL Compliant Title"), unique=True)
     description = TextField(max_length=200, blank=True)
+    created_at = DateTimeField(_("Date Created"), auto_now_add=True)
     start_time = DateTimeField(_("Start Time of Public Canvas Editing"))
     end_time = DateTimeField(_("Time the Canvas Will Stop Accepting Edits"))
     grid_width = PositiveSmallIntegerField(
         _("Grid horizontal (x) length, where max number of cells is this "
-          "times grid_height."),
-        default=8,)  # Default assumes a square grid
+          f"times grid_height (DEFAULT_GRID_PARANTHETICAL)"),
+        default=DEFAULT_SQUARE_GRID_SIZE,)  # Default assumes a square grid
     grid_height = PositiveSmallIntegerField(
         _("Grid vertical (y) length, where max number of cells is this "
-          "time grid_width."),
-        default=8,)  # Default assumes a square grid
+          f"time grid_width (DEFAULT_GRID_PARANTHETICAL)"),
+        default=DEFAULT_SQUARE_GRID_SIZE,)  # Default assumes a square grid
     # cell_divisions = PositiveSmallIntegerField(_("Cell Divisions"), default=8)
     # There's a possibilty for a 3rd dimension in future if helpful
     cell_width = PositiveSmallIntegerField(_("Width of cell grid "
-                                             "(defaults to 8x8 grid)"), default=8)
+                                             f"(DEFAULT_CELL_PARANTHETICAL)"),
+                                           default=DEFAULT_SQUARE_CELL_SIZE)
     cell_height = PositiveSmallIntegerField(_("Height of cell grid "
-                                              "(defaults to 8x8 grid)"), default=8)
+                                              "(DEFAULT_CELL_PARANTHETICAL)"),
+                                            default=DEFAULT_SQUARE_CELL_SIZE)
     # cell_type = PositiveSmallIntegerField("Diagonal")
+    cell_colour_range = PositiveSmallIntegerField(
+        _("Maximum range of colours"), default=1)
     creator = ForeignKey(AUTH_USER_MODEL, on_delete=CASCADE,
                          verbose_name=_("Person who created this Visual "
                                         "Canvas"))
@@ -113,7 +136,9 @@ class VisualCanvas(Model):
         if self.is_grid and cell_count == 0:
             for x in range(self.grid_width):
                 for y in range(self.grid_height):
-                    self.visual_cells.create(x_position=x, y_position=y)
+                    self.visual_cells.create(x_position=x, y_position=y,
+                                             width=self.cell_width,
+                                             height=self.cell_height)
         elif self.is_grid and add and not self.is_torus:
             try:
                 current_max_x, current_max_y = self.visual_cells.aggregate(
@@ -130,7 +155,9 @@ class VisualCanvas(Model):
             for x in range(self.grid_width):
                 for y in range(self.grid_height):
                     if x > current_max_x or y > current_max_y:
-                        self.visual_cells.create(x_position=x, y_position=y)
+                        self.visual_cells.create(x_position=x, y_position=y,
+                                                 width=self.cell_width,
+                                                 height=self.cell_height)
         elif not add and not self.is_torus:
             raise ValidationError(_("Cells can only be added to a grid if "
                                     "add=True"))
@@ -230,7 +257,10 @@ class VisualCanvas(Model):
     def choose_initial_cell(self, first_cell_algorithm: str = 'centre'):
         """Select first cell based on canvas_type and first_cell_algorithm."""
         if self.new_cells_allowed:
-            return self.visual_cells.create(x_position=0, y_position=0)
+            return self.visual_cells.create(x_position=0, y_position=0,
+                                            width=self.cell_width,
+                                            height=self.cell_height,
+                                            colour_range=self.cell_colour_range)
         else:
             coords = getattr(
                 self, self.INITIAL_CELL_METHODS[first_cell_algorithm])()
@@ -238,7 +268,9 @@ class VisualCanvas(Model):
                                          y_position=coords[1])
 
     def get_or_create_contiguous_cell(self,
-                                      first_cell_algorithm: str = 'centre'):
+                                      first_cell_algorithm: str = 'centre',
+                                      width: int = None, height: int = None,
+                                      cell_colour_range: int = None):
         """
         Find a continguous cell that's not owned
 
@@ -264,6 +296,9 @@ class VisualCanvas(Model):
         # if self.torus_grid:
         #     cells = self.visual_cells.filter(artist__isnull=True)
         # else:
+        width = width or self.cell_width
+        height = height or self.cell_height
+        cell_colour_range = cell_colour_range or self.cell_height
         allocated_cells = list(self.visual_cells.exclude(
             artist__isnull=True).values_list('x_position', 'y_position'))
         if not allocated_cells:
@@ -280,9 +315,11 @@ class VisualCanvas(Model):
                                   cell[1] + coordinate_difference[1])
                 if potential_cell not in allocated_cells:  # Might choose a pre-allocated cell
                     if self.new_cells_allowed:
-                        return VisualCell(x_position=potential_cell[0],
+                        return VisualCell(canvas=self,
+                                          x_position=potential_cell[0],
                                           y_position=potential_cell[1],
-                                          canvas=self)
+                                          width=width, height=height,
+                                          colour_range=cell_colour_range)
                     if self.is_torus:
                         potential_cell = self.correct_coordinates_for_torus(
                             potential_cell)
@@ -345,13 +382,6 @@ class VisualCanvas(Model):
         """
         return reverse('canvas', kwargs={'canvas_id': self.id})
 
-    def default_blank_cell(self):
-        return {'edges_horizontal': [0]*(self.cell_width**2 + self.cell_width),
-                'edges_vertical': [0]*(self.cell_height**2 + self.cell_height),
-                'edges_south_east': [0]*self.cell_width*self.cell_height,
-                'edges_south_west': [0]*self.cell_width*self.cell_height,
-                }
-
 
 # class TorusEdgeCellsManager(Manager):
 #
@@ -385,20 +415,55 @@ class VisualCell(Model):
         * Consider an automatic null initial cell
         * Consider enforcing Cell Dimensions (and potential flexibility).
         * Random cell generator (remove from Grid contructor)
-        * Conside  adding description, or json or both
+        * Consider adding description, or json or both
     """
+
+    NORTH = 0
+    EAST = 1
+    SOUTH = 2
+    WEST = 3
+
+    ADJACENT_NEIGHBOUR_CHOICES = (
+        (NORTH, 'north'),
+        (EAST, 'east'),
+        (SOUTH, 'south'),
+        (WEST, 'west'),
+    )
 
     id = UUIDField(default=uuid4, primary_key=True, editable=False)
     canvas = ForeignKey(VisualCanvas, on_delete=CASCADE,
                         related_name='visual_cells',
-                        verbose_name=_("Canvas Cell is Associated With"))
+                        verbose_name=_("Which canvas this cell is in"))
     artist = ForeignKey(AUTH_USER_MODEL, null=True, blank=True,
                         on_delete=SET_NULL, related_name='visual_cells',
-                        verbose_name=_("Artist for this Part of the Canvas"),)
+                        verbose_name=_("Artist assigned this part of the Canvas"),)
+    created_at = DateTimeField(_("Date cell was created"), auto_now_add=True)
     x_position = IntegerField(_("Horizontal position relative to 0"))
     y_position = IntegerField(_("Veritical position relative to 0"))
+    width = PositiveSmallIntegerField(_("Width of cell grid "
+                                        f"(DEFAULT_CELL_PARANTHETICAL)"),
+                                      default=DEFAULT_SQUARE_CELL_SIZE,
+                                      db_column='x_len')
+    height = PositiveSmallIntegerField(_("Height of cell grid "
+                                         f"(DEFAULT_CELL_PARANTHETICAL)"),
+                                       default=DEFAULT_SQUARE_CELL_SIZE,
+                                       db_column='y_len')
+    south_east_diagonals = PositiveSmallIntegerField(
+        "Length of south east pointed diagonal segments "
+        f"(DEFAULT_CELL_PARANTHETICAL)",
+        default=DEFAULT_SQUARE_CELL_DIAGONAL_SIZE,
+        db_column='z_len')
+    south_west_diagonals = PositiveSmallIntegerField(
+        "Length of south east pointed diagonal segments "
+        f"(DEFAULT_CELL_PARANTHETICAL)",
+        default=DEFAULT_SQUARE_CELL_DIAGONAL_SIZE,
+        db_column='t_len')
+    colour_range = PositiveSmallIntegerField(_("Maximum range of colours"),
+                                             default=1)
     is_editable = BooleanField(_("Whether artists are allowed to edit this "
-                                 "cell."), default=True)
+                                 "cell"), default=True)
+    neighbours_may_edit = BooleanField(_("Whether artist's neighbours are allowed "
+                                         "to edit this cell"), default=True)
 
     class Meta:
 
@@ -414,6 +479,17 @@ class VisualCell(Model):
                 not self.canvas.grid_height > self.y_position >= 0):
             raise ValidationError(_(f'Cell position {self.coordinates} is '
                                     'outside the grid'))
+
+    @property
+    def default_dimensions(self):
+        """Default ratios of lengths of rectangular cells with diagonals."""
+        return {'edges_horizontal': self.width**2 + self.width,
+                'edges_vertical': self.height**2 + self.height,
+                'edges_south_east': self.width*self.height,
+                'edges_south_west': self.width*self.height, }
+
+    def default_blank_cell(self):
+        return {k: [0]*l for k, l in self.default_dimensions.items()}
 
     @property
     def coordinates(self):
@@ -458,16 +534,8 @@ class VisualCell(Model):
             f'{self.artist.username if self.artist else "Not assigned"}'
         )
 
-    @staticmethod
-    def default_blank_list(x):
-        return [0]*x
-
-    def set_blank(self):
-        blank_cell_dict = self.canvas.default_blank_cell()
-        self.edits.create(edges_horizontal=blank_cell_dict['edges_horizontal'],
-                          edges_vertical=blank_cell_dict['edges_vertical'],
-                          edges_south_east=blank_cell_dict['edges_south_east'],
-                          edges_south_west=blank_cell_dict['edges_south_west'],)
+    def set_blank(self, **kwargs):
+        self.edits.create(**self.default_blank_cell(), **kwargs)
 
     def get_neighbours(self, as_tuple: bool = False):
         """
@@ -500,6 +568,12 @@ class VisualCell(Model):
         """List of valid edits."""
         return list(self.edits.filter(is_valid=True).values_list('id',
                                                                  flat=True))
+
+    @property
+    def latest_edit(self):
+        """Latest valid edit, often for display to artists for further edits."""
+        return self.edits.filter(is_valid=True).latest()
+
     # def set_neighbours(self):
     #     for direction, coordinates in CELL_NEIGHBOURS.items():
     #         try:
@@ -530,16 +604,22 @@ class VisualCellEdit(Model):
         * How to mark issues or skips in time series
         * See if it's worth adding ordering to Meta
         * See if the order_with_respect_to is worth it...
+        * Check if adding user id is helpful in case cell gets re-assigned
     """
+
     id = BigAutoField(primary_key=True)
     cell = ForeignKey(VisualCell, on_delete=CASCADE, related_name="edits")
-    timestamp = DateTimeField(auto_now=True)
+    timestamp = DateTimeField(auto_now_add=True)
     edges_horizontal = ArrayField(PositiveSmallIntegerField(), db_column='x')
     edges_vertical = ArrayField(PositiveSmallIntegerField(), db_column='y')
     edges_south_east = ArrayField(PositiveSmallIntegerField(), db_column='z')
     edges_south_west = ArrayField(PositiveSmallIntegerField(), db_column='t')
     is_valid = BooleanField(_("Whether the edit is valid and included "
                               "in time series"), default=True)
+    artist = ForeignKey(AUTH_USER_MODEL, on_delete=SET_NULL, null=True)
+    neighbour_edit = PositiveSmallIntegerField(
+        _("Which neighbour, if any, is the source of the edit"),
+        blank=True, null=True, choices=VisualCell.ADJACENT_NEIGHBOUR_CHOICES)
 
     def __str__(self):
         """
@@ -570,6 +650,22 @@ class VisualCellEdit(Model):
         except ValueError:  # cell has no edit number if not valid
             return None
 
+    def clean(self):
+        """Ensure array dimensions adhere to cell dimensions."""
+        for attr_name, length in self.cell.default_dimensions.items():
+            if len(getattr(self, attr_name)) != length:
+                raise ValidationError(f"{attr_name} with length "
+                                      f"{len(getattr(self, attr_name))} != "
+                                      f"{length} for cell {self.cell}")
+
     class Meta:
+        """
+        Designed to enfornce retaining information about each edit.
+
+        Note:
+            * Cannot have `order_with_respect_to` and `ordering` together.
+            * Enforcing permission is key
+        """
         order_with_respect_to = 'cell'
+        get_latest_by = 'timestamp'  # Hopefully order_with_respect_to + get
         # ordering = ('cell', 'timestamp')

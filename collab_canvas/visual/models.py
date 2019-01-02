@@ -138,7 +138,8 @@ class VisualCanvas(Model):
                 for y in range(self.grid_height):
                     self.visual_cells.create(x_position=x, y_position=y,
                                              width=self.cell_width,
-                                             height=self.cell_height)
+                                             height=self.cell_height,
+                                             colour_range=self.cell_colour_range)
         elif self.is_grid and add and not self.is_torus:
             try:
                 current_max_x, current_max_y = self.visual_cells.aggregate(
@@ -157,7 +158,8 @@ class VisualCanvas(Model):
                     if x > current_max_x or y > current_max_y:
                         self.visual_cells.create(x_position=x, y_position=y,
                                                  width=self.cell_width,
-                                                 height=self.cell_height)
+                                                 height=self.cell_height,
+                                                 colour_range=self.cell_colour_range)
         elif not add and not self.is_torus:
             raise ValidationError(_("Cells can only be added to a grid if "
                                     "add=True"))
@@ -254,23 +256,31 @@ class VisualCanvas(Model):
         'random': 'get_random_cell_coordinates',
     }
 
-    def choose_initial_cell(self, first_cell_algorithm: str = 'centre'):
+    def choose_initial_cell(self, first_cell_algorithm: str = 'centre',
+                            width: int = None, height: int = None,
+                            colour_range: int = None, **kwargs):
         """Select first cell based on canvas_type and first_cell_algorithm."""
+        width = width or self.cell_width
+        height = height or self.cell_height
+        colour_range = colour_range or self.cell_colour_range
         if self.new_cells_allowed:
             return self.visual_cells.create(x_position=0, y_position=0,
-                                            width=self.cell_width,
-                                            height=self.cell_height,
-                                            colour_range=self.cell_colour_range)
+                                            width=width, height=height,
+                                            colour_range=colour_range,
+                                            **kwargs)
         else:
             coords = getattr(
                 self, self.INITIAL_CELL_METHODS[first_cell_algorithm])()
             return self.visual_cells.get(x_position=coords[0],
-                                         y_position=coords[1])
+                                         y_position=coords[1],
+                                         width=width, height=height,
+                                         colour_range=colour_range, **kwargs)
 
     def get_or_create_contiguous_cell(self,
                                       first_cell_algorithm: str = 'centre',
-                                      width: int = None, height: int = None,
-                                      cell_colour_range: int = None):
+                                      width: int = None,
+                                      height: int = None,
+                                      colour_range: int = None, **kwargs):
         """
         Find a continguous cell that's not owned
 
@@ -298,7 +308,7 @@ class VisualCanvas(Model):
         # else:
         width = width or self.cell_width
         height = height or self.cell_height
-        cell_colour_range = cell_colour_range or self.cell_height
+        colour_range = colour_range or self.cell_colour_range
         allocated_cells = list(self.visual_cells.exclude(
             artist__isnull=True).values_list('x_position', 'y_position'))
         if not allocated_cells:
@@ -319,7 +329,8 @@ class VisualCanvas(Model):
                                           x_position=potential_cell[0],
                                           y_position=potential_cell[1],
                                           width=width, height=height,
-                                          colour_range=cell_colour_range)
+                                          colour_range=colour_range,
+                                          **kwargs)
                     if self.is_torus:
                         potential_cell = self.correct_coordinates_for_torus(
                             potential_cell)
@@ -332,7 +343,8 @@ class VisualCanvas(Model):
                     try:
                         blank_cell = self.visual_cells.get(
                             x_position=potential_cell[0],
-                            y_position=potential_cell[1])
+                            y_position=potential_cell[1], width=width,
+                            height=height, colour_range=colour_range, **kwargs)
                         assert blank_cell.artist is None
                         return blank_cell
                     except VisualCell.DoesNotExist:
@@ -416,6 +428,7 @@ class VisualCell(Model):
         * Consider enforcing Cell Dimensions (and potential flexibility).
         * Random cell generator (remove from Grid contructor)
         * Consider adding description, or json or both
+        * Combine ADJACENT_NEIGHBOUR_CHOICES and CELL_ADJACENTS
     """
 
     NORTH = 0

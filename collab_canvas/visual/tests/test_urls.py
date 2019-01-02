@@ -2,7 +2,7 @@ from django.urls import reverse, resolve
 
 from ..models import VisualCellEdit
 from .test_dynamic import BaseDynamicCanvasTest
-from .utils import CanvasFactory, UserFactory
+from .utils import CellFactory, UserFactory
 
 
 class TestDynamicURLs(BaseDynamicCanvasTest):
@@ -12,6 +12,8 @@ class TestDynamicURLs(BaseDynamicCanvasTest):
     def test_canvas_url(self):
         """Test url structure for initial dynamic canvas."""
         # user = UserFactory()
+        self.assertEqual(self.canvas.get_absolute_url(),
+                         f'/visual/canvas/{self.canvas.id}/')
         self.assertEqual(reverse('visual:canvas',
                                  kwargs={'canvas_id': self.canvas.id}),
                          f'/visual/canvas/{self.canvas.id}/')
@@ -20,16 +22,15 @@ class TestDynamicURLs(BaseDynamicCanvasTest):
 
     def test_cell_url(self):
         """Test url structure for initial dynamic canvas."""
-        user = UserFactory()
-        cell = self.canvas.get_or_create_contiguous_cell()
-        cell.artist = user
-        cell.save()
+        cell = CellFactory(canvas=self.canvas)
+        self.assertEqual(cell.get_absolute_url(),
+                         f'/visual/canvas/{self.canvas.id}/{cell.id}/')
         self.assertEqual(reverse('visual:cell',
                                  kwargs={'canvas_id': self.canvas.id,
-                                         'cell_id': user.id}),
-                         f'/visual/canvas/{self.canvas.id}/{user.id}/')
+                                         'cell_id': cell.artist.id}),
+                         f'/visual/canvas/{self.canvas.id}/{cell.artist.id}/')
         self.assertEqual(
-            resolve(f'/visual/canvas/{self.canvas.id}/{user.id}/').view_name,
+            resolve(f'/visual/canvas/{self.canvas.id}/{cell.artist.id}/').view_name,
             'visual:cell')
 
     def test_cell_edit_urls(self):
@@ -38,28 +39,34 @@ class TestDynamicURLs(BaseDynamicCanvasTest):
         cell = self.canvas.get_or_create_contiguous_cell()
         cell.artist = user
         cell.save()
-
-        edit1 = VisualCellEdit(edges_horizontal=[0, 1, 0, 0, 0, 0, 0, 0],
-                               edges_vertical=[0, 0, 1, 0, 0, 0, 0, 0],
-                               edges_south_east=[0, 0, 0, 0, 0, 0, 0, 0],
-                               edges_south_west=[0, 0, 0, 0, 0, 0, 0, 0])
-        edit2 = VisualCellEdit(edges_horizontal=[0, 1, 1, 0, 0, 0, 0, 0],
-                               edges_vertical=[0, 0, 1, 0, 0, 0, 0, 0],
-                               edges_south_east=[0, 0, 1, 0, 0, 0, 0, 0],
-                               edges_south_west=[0, 0, 0, 0, 0, 0, 0, 0])
+        # This should fill in the blank cells correctly by calling full_clean
+        edit1 = VisualCellEdit(cell=cell, artist=user,
+                               edges_horizontal=[0, 1] + [0]*10,
+                               edges_vertical=[0]*12,
+                               edges_south_east=[0]*9,
+                               edges_south_west=[0]*9)
+        edit2 = VisualCellEdit(cell=cell, artist=user,
+                               edges_horizontal=[0, 1, 1] + [0]*9,
+                               edges_vertical=[0]*12,
+                               edges_south_east=[0]*9,
+                               edges_south_west=[0]*9)
         for i, edit in enumerate([edit1, edit2], 1):
             with self.subTest(edit=edit):
+                edit.full_clean()
                 cell.edits.add(edit, bulk=False)
+                self.assertEqual(edit.get_absolute_url(),
+                                 f'/visual/canvas/{self.canvas.id}/'
+                                 f'{cell.id}/history/{i}/')
                 self.assertEqual(
                     reverse('visual:cell-edit',
                             kwargs={'canvas_id': self.canvas.id,
-                                    'cell_id': user.id,
+                                    'cell_id': cell.id,
                                     'edit_number': i}),
-                    (f'/visual/canvas/{self.canvas.id}/{user.id}/'
-                     f'{edit.edit_number}/'))
+                    (f'/visual/canvas/{self.canvas.id}/{cell.id}/'
+                     f'{edit.history_number}/'))
                 self.assertEqual(
                     resolve(f'/visual/canvas/{self.canvas.id}/'
-                            f'{user.id}/{edit.edit_number}/').view_name,
+                            f'{cell.id}/{edit.history_number}/').view_name,
                     'visual:cell-edit')
 
     # def test_cell_history_urls(self):

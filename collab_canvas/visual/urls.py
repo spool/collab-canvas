@@ -20,13 +20,13 @@ urlpatterns = [
     # path("current/", VisualView.as_view(), name="current")
 
     # These should only be visible to managers
-    path("canvas/<uuid:canvas_id>/<uuid:cell_id>/history/<int:cell_history>/",
-         VisualCellEdit.as_view(),
-         name="cell-history"),
+    path("canvas/<uuid:canvas_id>/", VisualCanvasView.as_view(), name="canvas"),
+    path("canvas/<uuid:canvas_id>/<uuid:cell_id>/", VisualCellView.as_view(),
+         name="cell"),
     path("canvas/<uuid:canvas_id>/<uuid:cell_id>/<int:edit_number>/",
          VisualCellEdit.as_view(),
          name="cell-edit"),
-    path("canvas/<uuid:canvas_id>/<uuid:cell_id>/", VisualCellView.as_view(),
-         name="cell"),
-    path("canvas/<uuid:canvas_id>/", VisualCanvasView.as_view(), name="canvas"),
+    path("canvas/<uuid:canvas_id>/<uuid:cell_id>/history/<int:cell_history>/",
+         VisualCellEdit.as_view(),
+         name="cell-history"),
 ]

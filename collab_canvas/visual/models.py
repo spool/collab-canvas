@@ -392,7 +392,7 @@ class VisualCanvas(Model):
 
         Sort UUIDs for canvases. Cell coordinates are urls.
         """
-        return reverse('canvas', kwargs={'canvas_id': self.id})
+        return reverse('visual:canvas', kwargs={'canvas_id': self.id})
 
 
 # class TorusEdgeCellsManager(Manager):
@@ -537,8 +537,8 @@ class VisualCell(Model):
 
     def get_absolute_url(self):
         """Canvas url and uuid to retain anonymity in cell position."""
-        return reverse('cell', kwargs={'canvas_id': self.canvas.id,
-                                       'cell_id': self.id})
+        return reverse('visual:cell', kwargs={'canvas_id': self.canvas.id,
+                                              'cell_id': self.id})
 
     def __str__(self):
         return (
@@ -573,8 +573,8 @@ class VisualCell(Model):
 
     @property
     def edit_ids(self):
-        """List of edits."""
-        return list(self.edits.values_list('id', flat=True))
+        """List of all edit ids (no filtering)."""
+        return list(self.get_visualcelledit_order())
 
     @property
     def valid_edit_ids(self):
@@ -646,9 +646,10 @@ class VisualCellEdit(Model):
 
     def get_absolute_url(self):
         """Using Canvas and Cell uuids to be able to reconstruct ordering."""
-        return reverse('cell-history', kwargs={'canvas_id': self.cell.canvas.id,
-                                               'cell_id': self.cell.id,
-                                               'edit_number': self.edit_number})
+        return reverse('visual:cell-history',
+                       kwargs={'canvas_id': self.cell.canvas.id,
+                               'cell_id': self.cell.id,
+                               'cell_history': self.history_number})
 
     @property
     def history_number(self):
@@ -666,6 +667,9 @@ class VisualCellEdit(Model):
     def clean(self):
         """Ensure array dimensions adhere to cell dimensions."""
         for attr_name, length in self.cell.default_dimensions.items():
+            # if not getattr(self, attr_name):
+            #     setattr(self, attr_name,
+            #             getattr(self.get_previous_in_order(), attr_name))
             if len(getattr(self, attr_name)) != length:
                 raise ValidationError(f"{attr_name} with length "
                                       f"{len(getattr(self, attr_name))} != "
@@ -681,4 +685,3 @@ class VisualCellEdit(Model):
         """
         order_with_respect_to = 'cell'
         get_latest_by = 'timestamp'  # Hopefully order_with_respect_to + get
-        # ordering = ('cell', 'timestamp')

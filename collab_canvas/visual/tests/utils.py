@@ -11,7 +11,7 @@ from django.core import serializers
 from django.test import TestCase
 from django.utils import timezone
 
-from collab_canvas.users.models import User
+from config.settings.base import AUTH_USER_MODEL
 from collab_canvas.visual.models import VisualCanvas, VisualCell
 
 
@@ -27,7 +27,7 @@ class SuperUser(DjangoModelFactory):
 
     class Meta:
 
-        model = User
+        model = AUTH_USER_MODEL
 
     name = 'Test Super User'
     username = 'test_super'
@@ -42,7 +42,7 @@ class UserFactory(DjangoModelFactory):
 
     class Meta:
 
-        model = User
+        model = AUTH_USER_MODEL
         django_get_or_create = ('username',)
 
     username = Sequence(lambda i: f'test{i}')

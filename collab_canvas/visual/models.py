@@ -622,6 +622,7 @@ class VisualCellEdit(Model):
 
     id = BigAutoField(primary_key=True)
     cell = ForeignKey(VisualCell, on_delete=CASCADE, related_name="edits")
+    artist = ForeignKey(AUTH_USER_MODEL, on_delete=SET_NULL, null=True)
     timestamp = DateTimeField(auto_now_add=True)
     edges_horizontal = ArrayField(PositiveSmallIntegerField(), db_column='x')
     edges_vertical = ArrayField(PositiveSmallIntegerField(), db_column='y')
@@ -629,7 +630,6 @@ class VisualCellEdit(Model):
     edges_south_west = ArrayField(PositiveSmallIntegerField(), db_column='t')
     is_valid = BooleanField(_("Whether the edit is valid and included "
                               "in time series"), default=True)
-    artist = ForeignKey(AUTH_USER_MODEL, on_delete=SET_NULL, null=True)
     neighbour_edit = PositiveSmallIntegerField(
         _("Which neighbour, if any, is the source of the edit"),
         blank=True, null=True, choices=VisualCell.ADJACENT_NEIGHBOUR_CHOICES)

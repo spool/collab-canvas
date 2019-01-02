@@ -12,7 +12,8 @@ from django.test import TestCase
 from django.utils import timezone
 
 from config.settings.base import AUTH_USER_MODEL
-from collab_canvas.visual.models import VisualCanvas, VisualCell
+from collab_canvas.visual.models import (VisualCanvas, VisualCell,
+                                         VisualCellEdit)
 
 
 class SuperUser(DjangoModelFactory):
@@ -97,6 +98,28 @@ class CellFactory(DjangoModelFactory):
     colour_range = 1
     is_editable = True
     neighbours_may_edit = True
+
+
+class CellEditFactory(DjangoModelFactory):
+
+    """Base CellEdit intance on a (0,0) cell of a dynamic canvas."""
+
+    class Meta:
+
+        model = VisualCellEdit
+        django_get_or_create = ('cell', 'artist', 'edges_horizontal',
+                                'edges_vertical', 'edges_south_east',
+                                'edges_south_west', 'is_valid',
+                                'neighbour_edit')
+
+    cell = SubFactory(CellFactory)
+    artist = SubFactory(UserFactory)
+    edges_horizontal = [0]*12
+    edges_vertical = [0]*12
+    edges_south_east = [0]*9
+    edges_south_west = [0]*9
+    is_valid = True
+    neighbour_edit = True
 
 
 @pytest.mark.django_db

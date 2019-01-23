@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 
 from ..models import VisualCell
-from .utils import BaseVisualTest, CanvasFactory, UserFactory, CellFactory
+from .utils import BaseVisualTest, CanvasFactory, UserFactory
 
 
 class TestCellAllocation3x3NonTorusGrid(BaseVisualTest):
@@ -85,11 +85,12 @@ class TestNonTorus2x2Grid(BaseVisualTest):
         self.assertEqual(self.canvas.visual_cells.count(), 4)
         for cell in self.canvas.visual_cells.order_by('x_position',
                                                       'y_position'):
-            with self.subTest("Check each cell for correct neighbours",
+            with self.subTest(f"Check {cell} for correct neighbours",
                               cell=cell):
-                self.assertEqual(cell.get_neighbours(as_tuple=True),
-                                 self.CORRECT_CELL_NEIGHBOURS[
-                                     cell.coordinates])
+                self.assertEqual(
+                    cell.get_neighbours(as_tuple=True,
+                                        include_null_neighbours=True),
+                    self.CORRECT_CELL_NEIGHBOURS[cell.coordinates])
 
     def test_unique_cell_coordinates_per_canvas(self):
         """
@@ -187,76 +188,34 @@ class TestNonTorus2x2Grid(BaseVisualTest):
     def test_modifying_width_and_height(self):
         """Test adding width and height and failures."""
         with self.subTest("Demonstrate failure in changing width without "
-                          "add=True"):
+                          "can_add=True"):
             self.canvas.grid_width = 3
             with transaction.atomic():
                 with self.assertRaises(ValidationError) as error:
                     self.canvas.generate_grid()
                 self.assertIn("Cells can only be added to a grid if "
-                              "add=True",
+                              "can_add=True",
                               str(error.exception))
-        with self.subTest("Demonstrate correct width increase with add=True"):
+        with self.subTest("Demonstrate correct width increase with "
+                          "can_add=True"):
             with transaction.atomic():
-                self.canvas.generate_grid(add=True)
+                self.canvas.generate_grid(can_add=True)
                 self.assertEqual(self.canvas.max_coordinates, (2, 1))
                 self.assertEqual(self.canvas.visual_cells.count(), 6)
-        with self.subTest("Demonstrate correct heigh increase with add=True"):
+        with self.subTest("Demonstrate correct heigh increase with "
+                          "can_add=True"):
             self.canvas.grid_height = 4
             with transaction.atomic():
-                self.canvas.generate_grid(add=True)
+                self.canvas.generate_grid(can_add=True)
                 self.assertEqual(self.canvas.max_coordinates, (2, 3))
                 self.assertEqual(self.canvas.visual_cells.count(), 12)
         with self.subTest("Raise error if trying to reduce height."):
             self.canvas.grid_height = 2
             with transaction.atomic():
                 with self.assertRaises(ValidationError) as error:
-                    self.canvas.generate_grid(add=True)
+                    self.canvas.generate_grid(can_add=True)
                 self.assertIn("Cannot add to grid unless both previous "
                               "grid max_coordinates (2, 3) are < "
                               "set max_coordinates (2, 1) for canvas "
                               "Test Non-Torus Grid",
                               str(error.exception))
-
-
-class TestCellEditing(BaseVisualTest):
-
-    def setUp(self):
-        """Create base initialised grid for testing."""
-        super().setUp()
-        self.cell = CellFactory()
-
-    def test_correct_cell_dimension(self):
-        """Test cells and edits adhere to canvas cell dimensions."""
-        cell_edit = self.cell.edits.create(edges_horizontal=[1] + [0]*11,
-                                           edges_vertical=[0]*12,
-                                           edges_south_east=[0]*9,
-                                           edges_south_west=[0]*9,
-                                           artist=self.cell.artist)
-        cell_edit.full_clean()
-        self.assertEqual(self.cell.latest_edit, cell_edit)
-
-    def test_incorrect_cell_dimensions(self):
-        cell_edit = self.cell.edits.create(edges_horizontal=[0, 1]*6,
-                                           edges_vertical=[0]*12,
-                                           edges_south_east=[0]*9,
-                                           edges_south_west=[0]*8,
-                                           artist=self.cell.artist)
-        with self.assertRaises(ValidationError) as error:
-            cell_edit.full_clean()
-        self.assertIn(f"edges_south_west with length 8 != 9 for cell "
-                      f"{self.cell}",
-                      str(error.exception))
-
-    # def test_creating_grid_permission(self):
-    #     try:
-    #         canvas = VisualCanvas.objects.create(
-    #             title='Test Canvas',
-    #             start_time=datetime.now(),
-    #             end_time=datetime.now() + timedelta(seconds=20),
-    #             grid_height=2,
-    #             creator=self.user,
-    #             is_torus=True
-    #         )
-    #     except VisualCanvas.PermissionError:
-    #         self.assertEqual(canvas.visual_cells.count(), 7)
-    #     assert False

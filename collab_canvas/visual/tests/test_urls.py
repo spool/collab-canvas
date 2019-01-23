@@ -1,8 +1,7 @@
 from django.urls import reverse, resolve
 
-from ..models import VisualCellEdit
 from .test_dynamic import BaseDynamicCanvasTest
-from .utils import CellEditFactory, CellFactory, UserFactory
+from .utils import CellEditFactory, CellFactory
 
 
 class TestDynamicURLs(BaseDynamicCanvasTest):
@@ -52,26 +51,32 @@ class TestDynamicURLs(BaseDynamicCanvasTest):
                     f'{cell_edit.history_number}/').view_name,
             'visual:cell-edit')
 
-    def test_cell_edit_urls(self):
-        """Test URLs as cell edits get saved with default length 8."""
-        user = UserFactory()
-        cell = self.canvas.get_or_create_contiguous_cell()
-        cell.artist = user
-        cell.save()
-        edit1 = VisualCellEdit(cell=cell, artist=user,
-                               edges_horizontal=[0, 1] + [0]*10,
-                               edges_vertical=[0]*12,
-                               edges_south_east=[0]*9,
-                               edges_south_west=[0]*9)
-        edit2 = VisualCellEdit(cell=cell, artist=user,
-                               edges_horizontal=[0, 1, 1] + [0]*9,
-                               edges_vertical=[0]*12,
-                               edges_south_east=[0]*9,
-                               edges_south_west=[0]*9)
-        for i, edit in enumerate([edit1, edit2], 1):
-            with self.subTest(f"Test cell edit {i}", edit=edit, cell=cell):
+    def test_cell_continuous_creation(self):
+        """
+        Test URLs as cell edits get saved.
+
+        Todo:
+            * Assess need to start with 1 rather than 0
+            * Might be assumption of initial state is 0, but given neighbours
+            may need to include that.
+        """
+        HORIZONTAL_EDGES = {1: [0, 1] + [0]*10,
+                            2: [0, 1, 1] + [0]*9}
+        # cell1 =
+        cell = CellFactory(canvas=self.canvas)
+        # edit1 = CellEditFactory(edges_horizontal=[0, 1] + [0]*10,
+        #                         )
+        # edit2 = CellEditFactory(edges_horizontal=[0, 1, 1] + [0]*9,
+        #                         cell=edit1.cell,
+        #                         artist=edit1.artist)
+        # IDs will likely start at 1
+        # https://docs.djangoproject.com/en/2.1/ref/models/options/#order-with-respect-to
+        for i in range(3, 1):
+            with self.subTest(f"Test cell edit {i}", i=i):
+                edit = CellEditFactory(cell=cell, artist=cell.artist,
+                                       edges_horizontal=HORIZONTAL_EDGES[i])
                 edit.full_clean()
-                cell.edits.add(edit, bulk=False)
+                # cell.edits.add(edit, bulk=False)
                 self.assertEqual(edit.get_absolute_url(),
                                  f'/visual/canvas/{self.canvas.id}/'
                                  f'{cell.id}/history/{i}/')

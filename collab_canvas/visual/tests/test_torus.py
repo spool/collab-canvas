@@ -70,7 +70,7 @@ class TestCreatingTorusGrid(BaseVisualTest):
             canvas.grid_height = 4
             with transaction.atomic():
                 with self.assertRaises(ValidationError) as error:
-                    canvas.generate_grid(add=True)
+                    canvas.generate_grid(can_add=True)
                 self.assertIn("Cells cannot be added to a torus that already "
                               "has 9 cells", str(error.exception))
 

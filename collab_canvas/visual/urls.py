@@ -6,7 +6,7 @@ Basic structure:
 /visual/create?
 
 Todo:
-    * Ensure
+    * Ensure permission applies for each path
 """
 from django.urls import path
 from .views import VisualCanvasView, VisualCellView, VisualCellEdit

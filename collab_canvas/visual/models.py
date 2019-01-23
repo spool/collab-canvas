@@ -9,7 +9,9 @@ Todo:
     * Possibility of generating random cells
     * Rearrange default blank and random cells as cell methods
 """
-from config.settings.base import AUTH_USER_MODEL
+from random import shuffle, choice
+from typing import Dict, Tuple, Type
+from uuid import uuid4
 
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import ValidationError
@@ -21,8 +23,7 @@ from django.urls import reverse
 from django.utils.text import slugify
 from django.utils.translation import ugettext_lazy as _
 
-from random import shuffle, choice
-from uuid import uuid4
+from config.settings.base import AUTH_USER_MODEL
 
 
 DEFAULT_SQUARE_GRID_SIZE = 8
@@ -40,28 +41,6 @@ DEFAULT_CELL_PARANTHETICAL = (
 )
 
 
-CELL_ADJACENTS = {
-    'north': (0, 1),
-    'east': (1, 0),
-    'south': (0, -1),
-    'west': (-1, 0),
-}
-
-
-CELL_CORNERS = {
-    'north_east': (1, 1),
-    'south_east': (1, -1),
-    'south_west': (-1, -1),
-    'north_west': (-1, 1),
-}
-
-
-CELL_NEIGHBOURS = {
-    **CELL_ADJACENTS,
-    **CELL_CORNERS
-}
-
-
 class VisualCanvas(Model):
 
     """
@@ -71,7 +50,7 @@ class VisualCanvas(Model):
     cell. If a torus then the grid height and width must be defined. If not a
     torus then grid_width and grid_height will enforce the maximum edges but
     not connect edge neighbours. If grid height and width are 0 and
-    new_cell_allowed is True then the canvas will grow with positive and
+    new_cells_allowed is True then the canvas will grow with positive and
     negative coordinates organically with each new artist.
 
     Todo:
@@ -130,7 +109,7 @@ class VisualCanvas(Model):
             raise ValidationError(_(f'Torus {self} must  have a width and '
                                     'height'))
 
-    def generate_grid(self, add=False):
+    def generate_grid(self, can_add=False):
         """Generate a grid."""
         cell_count = self.visual_cells.count()
         if self.is_grid and cell_count == 0:
@@ -140,7 +119,7 @@ class VisualCanvas(Model):
                                              width=self.cell_width,
                                              height=self.cell_height,
                                              colour_range=self.cell_colour_range)
-        elif self.is_grid and add and not self.is_torus:
+        elif self.is_grid and can_add and not self.is_torus:
             try:
                 current_max_x, current_max_y = self.visual_cells.aggregate(
                     Max('x_position'), Max('y_position')).values()
@@ -160,9 +139,9 @@ class VisualCanvas(Model):
                                                  width=self.cell_width,
                                                  height=self.cell_height,
                                                  colour_range=self.cell_colour_range)
-        elif not add and not self.is_torus:
+        elif not can_add and not self.is_torus:
             raise ValidationError(_("Cells can only be added to a grid if "
-                                    "add=True"))
+                                    "can_add=True"))
         elif self.is_torus and cell_count > 0:
             raise ValidationError(_("Cells cannot be added to a torus that "
                                     f"already has {cell_count} cells"))
@@ -237,7 +216,7 @@ class VisualCanvas(Model):
 
     # def find_empty_torus_cell(self):
     #     """Query for place for a new cell."""
-    #     coordinate_differences = CELL_ADJACENTS.values()
+    #     coordinate_differences = ADJACENT_COORDINATES.values()
     #     available_cells = self.visual_cells.filter(artist__isnull=True)
     #                                                   # Q(north__isnull=True) |
     #                                                   # Q(east__isnull=True) |
@@ -280,14 +259,18 @@ class VisualCanvas(Model):
                                       first_cell_algorithm: str = 'centre',
                                       width: int = None,
                                       height: int = None,
-                                      colour_range: int = None, **kwargs):
+                                      colour_range: int = None,
+                                      # artist: Type[AUTH_USER_MODEL] = None,
+                                      **kwargs):
         """
         Find a continguous cell that's not owned
 
         Todo:
+            * Refactor to reduce complexity
             * Test algorithm dict method
             * Consdier ways of auto-filtering to edges of allocated cells
             * Consider possibility of separate bubbles that can connect with basic radius
+            * Determine a means of dealing with passing an artist
         """
         # if self.torus_grid:
         #     raise ValidationError(_('New cells cannot be added to a torus grid.'))
@@ -309,6 +292,8 @@ class VisualCanvas(Model):
         width = width or self.cell_width
         height = height or self.cell_height
         colour_range = colour_range or self.cell_colour_range
+        # Retrieve all cells currently allocated to artists so future cells are
+        # added contiguously to them
         allocated_cells = list(self.visual_cells.exclude(
             artist__isnull=True).values_list('x_position', 'y_position'))
         if not allocated_cells:
@@ -316,7 +301,7 @@ class VisualCanvas(Model):
         if (self.is_grid and
                 len(allocated_cells) >= self.grid_height*self.grid_width):
             raise self.FullGridException
-        COORDINATE_DIFFERENCES = list(CELL_ADJACENTS.values())
+        COORDINATE_DIFFERENCES = list(VisualCell.ADJACENT_COORDINATES.values())
         shuffle(allocated_cells)
         for cell in allocated_cells:
             shuffle(COORDINATE_DIFFERENCES)
@@ -345,13 +330,30 @@ class VisualCanvas(Model):
                             x_position=potential_cell[0],
                             y_position=potential_cell[1], width=width,
                             height=height, colour_range=colour_range, **kwargs)
-                        assert blank_cell.artist is None
-                        return blank_cell
+                        if not blank_cell.artist:
+                            return blank_cell
                     except VisualCell.DoesNotExist:
                         raise VisualCell.DoesNotExist(_("No cell with that position"))
                     except AssertionError:
                         raise ValidationError(_("That cell is already owned by "
                                                 f"another artist {blank_cell.artist}"))
+        raise VisualCell.DoesNotExist(_(f"No available cells in {self} found"))
+
+    def assign_cell(self, artist: Type[AUTH_USER_MODEL], *args, **kwargs):
+        """Either create or assign a cell for passed artist if possible."""
+        try:
+            cell = self.visual_cells.get(artist=artist, *args, **kwargs)
+            return cell
+        except VisualCell.DoesNotExist:
+            cell = self.get_or_create_contiguous_cell(*args, **kwargs)
+            cell.artist = artist
+            cell.full_clean()
+            cell.save()
+            return cell
+
+    # def artists(self):
+    #     """Return a querset of all currently assigned artists."""
+    #     self.cells
 
     class FullGridException(Exception):
         pass
@@ -428,7 +430,8 @@ class VisualCell(Model):
         * Consider enforcing Cell Dimensions (and potential flexibility).
         * Random cell generator (remove from Grid contructor)
         * Consider adding description, or json or both
-        * Combine ADJACENT_NEIGHBOUR_CHOICES and CELL_ADJACENTS
+        * Combine ADJACENT_NEIGHBOUR_CHOICES and ADJACENT_COORDINATES
+        * Consider adding https://mypy.readthedocs.io/en/latest/final_attrs.html
     """
 
     NORTH = 0
@@ -436,12 +439,39 @@ class VisualCell(Model):
     SOUTH = 2
     WEST = 3
 
-    ADJACENT_NEIGHBOUR_CHOICES = (
+    ADJACENT_CHOICES = (
         (NORTH, 'north'),
         (EAST, 'east'),
         (SOUTH, 'south'),
         (WEST, 'west'),
     )
+
+    ADJACENT_COORDINATES = {
+        'north': (0, 1),
+        'east': (1, 0),
+        'south': (0, -1),
+        'west': (-1, 0),
+    }
+
+    CORNER_COORDINATES = {
+        'north_east': (1, 1),
+        'south_east': (1, -1),
+        'south_west': (-1, -1),
+        'north_west': (-1, 1),
+    }
+
+    NEIGHBOUR_COORDINATES = {
+        **ADJACENT_COORDINATES,
+        **CORNER_COORDINATES
+    }
+
+    # Assuming as cells have the same dimensions (default cells)
+    # ADJACENT_NEIGHBOUR_EDGES = {
+    #     'north': self.lattice_dimensions['edges_horizontal'][-self.width:],
+    #     'east': self.lattice_dimensions['edges_vertical'][self.height:],
+    #     'south': self.lattice_dimensions['edges_horizontal'][self.width:],
+    #     'west': self.lattice_dimensions['edges_vertical'][-self.height:],
+    # }
 
     id = UUIDField(default=uuid4, primary_key=True, editable=False)
     canvas = ForeignKey(VisualCanvas, on_delete=CASCADE,
@@ -487,22 +517,142 @@ class VisualCell(Model):
 
     def clean(self):
         """Means of testing if cell is outside a pre-defined grid."""
-        if (self.canvas.grid_height and
-                not self.canvas.grid_width > self.x_position >= 0 or
-                not self.canvas.grid_height > self.y_position >= 0):
+        if ((self.canvas.grid_height or self.canvas.grid_width) and
+                (not self.canvas.grid_width > self.x_position >= 0 or
+                 not self.canvas.grid_height > self.y_position >= 0)):
             raise ValidationError(_(f'Cell position {self.coordinates} is '
                                     'outside the grid'))
 
+    # def save(self):
+    #     """Initiate a first edit upon creation, including neighboring edges."""
+    #     if self.neighbours_may_edit:
+    #         if not self.id:
+    #             self.initialise_with_neighbour_edges()
+    #         elif
+
     @property
-    def default_dimensions(self):
+    def adjacent_neighbour_portions(self):
+        return {'north': {'edge_name': 'edges_horizontal',
+                          'self_portion': self.width,
+                          'neighbour_portion': -self.width},
+                'east': {'edge_name': 'edges_vertical',
+                         'self_portion': -self.height,
+                         'neighbour_portion': self.height},
+                'south': {'edge_name': 'edges_horizontal',
+                          'self_portion': -self.width,
+                          'neighbour_portion': self.width},
+                'west': {'edge_name': 'edges_horizontal',
+                         'self_portion': self.height,
+                         'neighbour_portion': -self.height}, }
+
+    def default_blank_cell(self):
+        return {k: [0]*l for k, l in self.lattice_dimensions.items()}
+
+    def set_blank(self, **kwargs):
+        self.edits.create(**self.default_blank_cell(), **kwargs)
+
+    # @staticmethod
+    # def set_neighbour_edge(edges, edge: str, self_portion: int,
+    #                        neighbour_portion: int) -> dict:
+    # # Set the cell section based on the range in each
+    # # adjacent_neighbour_portions configuration
+    # if portion[self_portion] > 0:
+    #     if portion[neighbour_portion] > 0:
+    #         edges[portion[edge]][:portion[self_portion]] = (
+    #             getattr(neighbour.latest_valid_edit,
+    #                     portion[edge])[:neighbour_portion]
+    #         )
+    #     else:  # neighbour_portion < 0, so apply to
+    #         edges[portion[edge]][:portion[self_portion]] = (
+    #             getattr(neighbour.latest_valid_edit,
+    #                     portion[edge])[neighbour_portion:]
+    #         )
+    # else:  # self_portion < 0, so copy to end of the affected edge
+    #     if portion[neighbour_portion] > 0:
+    #         edges[portion[edge]][portion[self_portion]:] = (
+    #             getattr(neighbour.latest_valid_edit,
+    #                     portion[edge])[:neighbour_portion]
+    #         )
+    #     else:
+    #         edges[portion[edge]][portion[self_portion]:] = (
+    #             getattr(neighbour.latest_valid_edit,
+    #                     portion[edge])[neighbour_portion:]
+    #         )
+
+    def get_blank_with_neighbour_edges(self, **kwargs):
+        """Get the neighbours' current edge states."""
+        edges_dict = self.default_blank_cell()
+        neighbours = self.get_neighbours(
+            neighbour_coords=self.ADJACENT_COORDINATES)
+        for direction, neighbour in neighbours.items():
+            if neighbour:
+                edge_name, self_portion, neighbour_portion = (
+                    self.adjacent_neighbour_portions[direction].values()
+                )  # This assumes python >=3.7 where dicts are ordered
+                edge_segment = edges_dict[edge_name]
+                neighbour_segment = getattr(neighbour.latest_valid_edit, edge_name)
+                neighbour_edge = (neighbour_segment[:neighbour_portion] if
+                                  neighbour_portion > 0
+                                  else neighbour_segment[neighbour_portion:])
+                if self_portion > 0:
+                    # Todo: check these are the right portions
+                    edge_segment[:self_portion] = neighbour_edge
+                else:
+                    edge_segment[self_portion:] = neighbour_edge
+        return edges_dict
+
+    def extract_neighbour_edge_deltas(self):
+        """
+        Extract deltas that may need to be applied to neighbours.
+
+        Note:
+            * Currently only gets from latest *valid* edit
+        """
+        neighbours = {}
+        delta = self.latest_valid_edit.get_edges_delta()
+        for direction, edge_segment in (
+                self.adjacent_neighbour_portions.items()
+        ):
+            edge = delta[edge_segment['edge_name']]
+            segment = edge_segment['self_portion']
+            delta_portion = edge[:segment] if segment > 0 else edge[segment:]
+            if 1 in delta_portion or -1 in delta_portion:
+                neighbours[direction] = {
+                    'edge_name': edge_segment['edge_name'],
+                    'edge': edge,
+                    'edge_delta': delta_portion,
+                    'segment': edge_segment['neighbour_portion']}
+        return neighbours
+
+    def dispatch_neighbour_edits(self):
+        delta_portions = self.extract_neighbour_edge_deltas()
+        if delta_portions:
+            neighbour_coordinates_dict = {k: self.ADJACENT_COORDINATES[k]
+                                          for k in delta_portions}
+            neighbours = self.get_neighbours(
+                neighbour_coords=neighbour_coordinates_dict)
+            for direction, neighbour in neighbours.items():
+                edge_name, edge, edge_delta, segment = (
+                    delta_portions[direction].values()
+                )
+                neighbour_latest = neighbour.latest_valid_edit
+                neighbour_latest.id = None  # Copies the most recent instance
+                neighbour_latest.artist = self.artist
+                latest_edge = getattr(neighbour_latest, edge_name)
+                # Todo: check these are the right portions
+                new_edge = (edge_delta + latest_edge[segment:] if segment > 0
+                            else latest_edge[:segment] + edge_delta)
+                setattr(neighbour_latest, edge_name, new_edge)
+                neighbour_latest.full_clean()
+                neighbour_latest.save()
+
+    @property
+    def lattice_dimensions(self):
         """Default ratios of lengths of rectangular cells with diagonals."""
         return {'edges_horizontal': self.width**2 + self.width,
                 'edges_vertical': self.height**2 + self.height,
                 'edges_south_east': self.width*self.height,
                 'edges_south_west': self.width*self.height, }
-
-    def default_blank_cell(self):
-        return {k: [0]*l for k, l in self.default_dimensions.items()}
 
     @property
     def coordinates(self):
@@ -547,15 +697,15 @@ class VisualCell(Model):
             f'{self.artist.username if self.artist else "Not assigned"}'
         )
 
-    def set_blank(self, **kwargs):
-        self.edits.create(**self.default_blank_cell(), **kwargs)
-
-    def get_neighbours(self, as_tuple: bool = False):
+    def get_neighbours(self, as_tuple: bool = False,
+                       neighbour_coords: Dict[str, Tuple[int, int]] = None,
+                       include_null_neighbours: bool = False):
         """
         Return Moore's neighbours, including torus neighbours if appropriate.
         """
+        neighbour_coords = neighbour_coords or self.NEIGHBOUR_COORDINATES
         neighbours = {}
-        for direction, coordinate_difference in CELL_NEIGHBOURS.items():
+        for direction, coordinate_difference in neighbour_coords.items():
             coords = (self.x_position + coordinate_difference[0],
                       self.y_position + coordinate_difference[1])
             if self.canvas.is_torus:
@@ -565,9 +715,12 @@ class VisualCell(Model):
                                                          y_position=coords[1])
             except VisualCell.DoesNotExist:
                 neighbour = None
-            if neighbour and as_tuple:
-                neighbours[direction] = neighbour.coordinates
-            else:
+            if neighbour:
+                if as_tuple:
+                    neighbours[direction] = neighbour.coordinates
+                else:
+                    neighbours[direction] = neighbour
+            elif include_null_neighbours:
                 neighbours[direction] = neighbour
         return neighbours
 
@@ -583,7 +736,7 @@ class VisualCell(Model):
                                                                  flat=True))
 
     @property
-    def latest_edit(self):
+    def latest_valid_edit(self):
         """Latest valid edit, often for display to artists for further edits."""
         return self.edits.filter(is_valid=True).latest()
 
@@ -620,6 +773,8 @@ class VisualCellEdit(Model):
         * Check if adding user id is helpful in case cell gets re-assigned
     """
 
+    EDGE_FIELD_PREFIX = 'edges_'
+
     id = BigAutoField(primary_key=True)
     cell = ForeignKey(VisualCell, on_delete=CASCADE, related_name="edits")
     artist = ForeignKey(AUTH_USER_MODEL, on_delete=SET_NULL, null=True)
@@ -632,7 +787,7 @@ class VisualCellEdit(Model):
                               "in time series"), default=True)
     neighbour_edit = PositiveSmallIntegerField(
         _("Which neighbour, if any, is the source of the edit"),
-        blank=True, null=True, choices=VisualCell.ADJACENT_NEIGHBOUR_CHOICES)
+        blank=True, null=True, choices=VisualCell.ADJACENT_CHOICES)
 
     def __str__(self):
         """
@@ -651,6 +806,62 @@ class VisualCellEdit(Model):
                                'cell_id': self.cell.id,
                                'cell_history': self.history_number})
 
+    @classmethod
+    def get_edge_names(cls):
+        """Currently returns all egdes, but may be restrictable in future."""
+        return [field.name for field in cls._meta.get_fields()
+                if field.name.startswith(cls.EDGE_FIELD_PREFIX)]
+
+    def get_edges(self):
+        """Return a dict of edges."""
+        return {edge_name: getattr(self, edge_name) for edge_name in
+                self.get_edge_names()}
+
+    # def get_edges(self):
+    #     """Yield edges as tuples of name and value."""
+    #     for edge_name in self.get_edge_names():
+    #         yield edge_name, getatrr()
+
+    def get_edges_delta(self, valid_only: bool = True):
+        """
+        Get difference in edge vector between self and valid predecessor.
+
+        Note:
+            * If valid_only is False then it will be delta with respect to
+            timestamp.
+        """
+        previous_edit = (self.get_previous_valid_edit() if valid_only else
+                         self.get_previous_in_order())
+        if previous_edit:
+            delta = {}
+            for edge_name in self.get_edge_names():
+                delta[edge_name] = [current - previous for current, previous in
+                                    zip(getattr(self, edge_name),
+                                        getattr(previous_edit, edge_name))]
+            return delta
+        else:
+            return self.cell.get_blank_with_neighbour_edges()
+
+    def get_previous_valid_edit(self):
+        """Get previous edit where is_valid is true."""
+        try:
+            edit = self.get_previous_in_order()
+            # i = 0
+            while True:
+                if edit.is_valid:
+                    return edit
+                edit = edit.get_previous_in_order()
+                # if i == 7:
+                #     assert False
+                # i += 1
+        except VisualCellEdit.DoesNotExist:
+            return None
+        # while not edit.is_valid:
+        #     edit = self.get_previous_in_order()
+        # # else:
+        # #     return None  # If the loop finishes before valid_edit is found
+        # return edit
+
     @property
     def history_number(self):
         """Return number in cell's history, irrespective of is_valid."""
@@ -658,7 +869,7 @@ class VisualCellEdit(Model):
 
     @property
     def edit_number(self):
-        """Return what number edit this is of its cell."""
+        """Return what number edit this is of valid edits to parent cell."""
         try:
             return self.cell.valid_edit_ids.index(self.id)
         except ValueError:  # cell has no edit number if not valid
@@ -666,10 +877,11 @@ class VisualCellEdit(Model):
 
     def clean(self):
         """Ensure array dimensions adhere to cell dimensions."""
-        for attr_name, length in self.cell.default_dimensions.items():
+        for attr_name, length in self.cell.lattice_dimensions.items():
             # if not getattr(self, attr_name):
             #     setattr(self, attr_name,
             #             getattr(self.get_previous_in_order(), attr_name))
+            # Todo: https://docs.djangoproject.com/en/2.1/ref/contrib/postgres/fields/#len
             if len(getattr(self, attr_name)) != length:
                 raise ValidationError(f"{attr_name} with length "
                                       f"{len(getattr(self, attr_name))} != "

@@ -16,6 +16,21 @@ from collab_canvas.visual.models import (VisualCanvas, VisualCell,
                                          VisualCellEdit)
 
 
+TEST_GRID_WIDTH = 2
+TEST_GRID_HEIGHT = TEST_GRID_WIDTH
+
+TEST_CELL_WIDTH = 3
+TEST_CELL_HEIGHT = TEST_CELL_WIDTH
+TEST_CELL_SOUTH_EAST_DIAGONAL = TEST_CELL_WIDTH**2
+TEST_CELL_SOUTH_WEST_DIAGONAL = TEST_CELL_SOUTH_EAST_DIAGONAL
+TEST_CELL_COLOUR_RANGE = 1
+
+TEST_CELL_HORIZONTAL = TEST_CELL_WIDTH**2 + TEST_CELL_WIDTH
+TEST_CELL_VERTICAL = TEST_CELL_HEIGHT**2 + TEST_CELL_HEIGHT
+TEST_CELL_SOUTH_EAST = TEST_CELL_SOUTH_EAST_DIAGONAL
+TEST_CELL_SOUTH_WEST = TEST_CELL_SOUTH_WEST_DIAGONAL
+
+
 class SuperUser(DjangoModelFactory):
 
     """
@@ -66,10 +81,10 @@ class CanvasFactory(DjangoModelFactory):
     title = 'Test Non-Torus Grid'
     start_time = LazyFunction(timezone.now)
     end_time = LazyAttribute(lambda c: c.start_time + timedelta(seconds=600))
-    grid_height = 2
-    grid_width = 2
-    cell_width = 3
-    cell_height = 3
+    grid_height = TEST_GRID_HEIGHT
+    grid_width = TEST_GRID_WIDTH
+    cell_height = TEST_CELL_HEIGHT
+    cell_width = TEST_CELL_WIDTH
     creator = SubFactory(SuperUser)
     new_cells_allowed = False
     is_torus = False
@@ -91,11 +106,11 @@ class CellFactory(DjangoModelFactory):
     artist = SubFactory(UserFactory)
     x_position = 0
     y_position = 0
-    width = 3
-    height = 3
-    south_east_diagonals = 2
-    south_west_diagonals = 2
-    colour_range = 1
+    width = TEST_CELL_WIDTH
+    height = TEST_CELL_HEIGHT
+    south_east_diagonals = TEST_CELL_SOUTH_EAST_DIAGONAL
+    south_west_diagonals = TEST_CELL_SOUTH_WEST_DIAGONAL
+    colour_range = TEST_CELL_COLOUR_RANGE
     is_editable = True
     neighbours_may_edit = True
 
@@ -114,10 +129,10 @@ class CellEditFactory(DjangoModelFactory):
 
     cell = SubFactory(CellFactory)
     artist = SubFactory(UserFactory)
-    edges_horizontal = [0]*12
-    edges_vertical = [0]*12
-    edges_south_east = [0]*9
-    edges_south_west = [0]*9
+    edges_horizontal = [0]*TEST_CELL_HORIZONTAL
+    edges_vertical = [0]*TEST_CELL_VERTICAL
+    edges_south_east = [0]*TEST_CELL_SOUTH_EAST
+    edges_south_west = [0]*TEST_CELL_SOUTH_WEST
     is_valid = True
     neighbour_edit = True
 

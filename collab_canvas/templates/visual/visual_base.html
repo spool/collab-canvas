@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% load static i18n compress%}
+
+
+{% block sketch %}
+  <script src={% static 'js/p5.min.js' %}></script>
+  <script src={% static 'js/sfit-lib.js' %}></script>
+  {% block visualsketch %}
+  {% endblock visualsketch %}
+{% endblock sketch %}

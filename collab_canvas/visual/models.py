@@ -687,8 +687,7 @@ class VisualCell(Model):
 
     def get_absolute_url(self):
         """Canvas url and uuid to retain anonymity in cell position."""
-        return reverse('visual:cell', kwargs={'canvas_id': self.canvas.id,
-                                              'cell_id': self.id})
+        return reverse('visual:cell', kwargs={'cell_id': self.id})
 
     def __str__(self):
         return (
@@ -802,8 +801,7 @@ class VisualCellEdit(Model):
     def get_absolute_url(self):
         """Using Canvas and Cell uuids to be able to reconstruct ordering."""
         return reverse('visual:cell-history',
-                       kwargs={'canvas_id': self.cell.canvas.id,
-                               'cell_id': self.cell.id,
+                       kwargs={'cell_id': self.cell.id,
                                'cell_history': self.history_number})
 
     @classmethod

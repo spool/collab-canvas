@@ -23,13 +23,12 @@ class TestDynamicURLs(BaseDynamicCanvasTest):
         """Test url structure for initial dynamic canvas."""
         cell = CellFactory(canvas=self.canvas)
         self.assertEqual(cell.get_absolute_url(),
-                         f'/visual/canvas/{self.canvas.id}/{cell.id}/')
+                         f'/visual/canvas/cell/{cell.id}/')
         self.assertEqual(reverse('visual:cell',
-                                 kwargs={'canvas_id': self.canvas.id,
-                                         'cell_id': cell.artist.id}),
-                         f'/visual/canvas/{self.canvas.id}/{cell.artist.id}/')
+                                 kwargs={'cell_id': cell.artist.id}),
+                         f'/visual/canvas/cell/{cell.artist.id}/')
         self.assertEqual(
-            resolve(f'/visual/canvas/{self.canvas.id}/{cell.artist.id}/').view_name,
+            resolve(f'/visual/canvas/cell/{cell.artist.id}/').view_name,
             'visual:cell')
 
     def test_cell_edit_url(self):
@@ -37,17 +36,15 @@ class TestDynamicURLs(BaseDynamicCanvasTest):
         cell_edit = CellEditFactory(cell=CellFactory(canvas=self.canvas))
         cell_edit.clean()
         self.assertEqual(cell_edit.get_absolute_url(),
-                         f'/visual/canvas/{self.canvas.id}/'
-                         f'{cell_edit.cell.id}/history/1/')
+                         f'/visual/canvas/cell/{cell_edit.cell.id}/history/1/')
         self.assertEqual(
             reverse('visual:cell-edit',
-                    kwargs={'canvas_id': self.canvas.id,
-                            'cell_id': cell_edit.cell.id,
+                    kwargs={'cell_id': cell_edit.cell.id,
                             'edit_number': 1}),
-            (f'/visual/canvas/{self.canvas.id}/{cell_edit.cell.id}/'
+            (f'/visual/canvas/cell/{cell_edit.cell.id}/'
              f'{cell_edit.history_number}/'))
         self.assertEqual(
-            resolve(f'/visual/canvas/{self.canvas.id}/{cell_edit.cell.id}/'
+            resolve(f'/visual/canvas/cell/{cell_edit.cell.id}/'
                     f'{cell_edit.history_number}/').view_name,
             'visual:cell-edit')
 
@@ -78,17 +75,13 @@ class TestDynamicURLs(BaseDynamicCanvasTest):
                 edit.full_clean()
                 # cell.edits.add(edit, bulk=False)
                 self.assertEqual(edit.get_absolute_url(),
-                                 f'/visual/canvas/{self.canvas.id}/'
-                                 f'{cell.id}/history/{i}/')
+                                 f'/visual/canvas/cell/{cell.id}/history/{i}/')
                 self.assertEqual(
-                    reverse('visual:cell-edit',
-                            kwargs={'canvas_id': self.canvas.id,
-                                    'cell_id': cell.id,
-                                    'edit_number': i}),
-                    (f'/visual/canvas/{self.canvas.id}/{cell.id}/'
-                     f'{edit.history_number}/'))
+                    reverse('visual:cell-edit', kwargs={'cell_id': cell.id,
+                                                        'edit_number': i}),
+                    (f'/visual/canvas/cell/{cell.id}/{edit.history_number}/'))
                 self.assertEqual(
-                    resolve(f'/visual/canvas/{self.canvas.id}/'
+                    resolve('/visual/canvas/cell/'
                             f'{cell.id}/{edit.history_number}/').view_name,
                     'visual:cell-edit')
 

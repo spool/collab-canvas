@@ -1,6 +1,7 @@
 from datetime import timedelta
 
-from factory import LazyAttribute, LazyFunction, Sequence, SubFactory
+from factory import (LazyAttribute, LazyFunction, PostGenerationMethodCall,
+                     Sequence, SubFactory)
 from factory.django import DjangoModelFactory
 
 import pytest
@@ -30,6 +31,8 @@ TEST_CELL_VERTICAL = TEST_CELL_HEIGHT**2 + TEST_CELL_HEIGHT
 TEST_CELL_SOUTH_EAST = TEST_CELL_SOUTH_EAST_DIAGONAL
 TEST_CELL_SOUTH_WEST = TEST_CELL_SOUTH_WEST_DIAGONAL
 
+TEST_USER_PASSWORD = 'secret'
+
 
 class SuperUser(DjangoModelFactory):
 
@@ -47,7 +50,8 @@ class SuperUser(DjangoModelFactory):
 
     name = 'Test Super User'
     username = 'test_super'
-    password = 'secret'
+    password = PostGenerationMethodCall('set_password',
+                                        TEST_USER_PASSWORD)
     email = 'super@test.com'
     is_superuser = True
 
@@ -63,7 +67,8 @@ class UserFactory(DjangoModelFactory):
 
     username = Sequence(lambda i: f'test{i}')
     name = Sequence(lambda i: f'Test User {i}')
-    password = LazyAttribute(lambda u: u.username)
+    password = PostGenerationMethodCall('set_password',
+                                        TEST_USER_PASSWORD)
     email = LazyAttribute(lambda u: f'{u.username}@test.com')
 
 

@@ -62,6 +62,7 @@ DJANGO_APPS = [
     'django.contrib.admin',
 ]
 THIRD_PARTY_APPS = [
+    'channels',
     'crispy_forms',
     'allauth',
     'allauth.account',
@@ -263,3 +264,5 @@ INSTALLED_APPS += ['compressor']
 STATICFILES_FINDERS += ['compressor.finders.CompressorFinder']
 # Your stuff...
 # ------------------------------------------------------------------------------
+# https://channels.readthedocs.io/en/latest/installation.html
+ASGI_APPLICATION = "visual.routing.application"

@@ -265,4 +265,4 @@ STATICFILES_FINDERS += ['compressor.finders.CompressorFinder']
 # Your stuff...
 # ------------------------------------------------------------------------------
 # https://channels.readthedocs.io/en/latest/installation.html
-ASGI_APPLICATION = "visual.routing.application"
+ASGI_APPLICATION = "collab_canvas.visual.routing.application"

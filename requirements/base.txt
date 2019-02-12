@@ -26,3 +26,4 @@ coreapi==2.3.3  # https://github.com/core-api/python-client
 # Local
 # ------------------------------------------------------------------------------
 channels==2.1.7  # https://github.com/django/channels
+channels_redis==2.3.3  # https://github.com/django/channels_redis

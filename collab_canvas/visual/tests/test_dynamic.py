@@ -89,11 +89,11 @@ class TestGeneratingEmptyCanvas(BaseDynamicCanvasTest):
         artist1 = UserFactory()
         artist2 = UserFactory()
         artist3 = UserFactory()
-        self.canvas.assign_cell(artist1)
-        self.canvas.assign_cell(artist2)
+        self.canvas.get_or_assign_cell(artist1)
+        self.canvas.get_or_assign_cell(artist2)
         self.canvas.new_cells_allowed = False
         with self.assertRaises(VisualCell.DoesNotExist) as error:
-            self.canvas.assign_cell(artist3)
+            self.canvas.get_or_assign_cell(artist3)
         self.assertIn(f"No available cells in {self.canvas} found",
                       str(error.exception))
 
@@ -182,7 +182,7 @@ class TestCellEditing(BaseVisualTest):
         self.cell.canvas.save()
         artist_1 = UserFactory()
 
-        neighbour_cell = self.cell.canvas.assign_cell(artist_1)
+        neighbour_cell = self.cell.canvas.get_or_assign_cell(artist_1)
 
         # A neighbour_cell should be contiguous with self.cell, so edge edits
         # that overlap effect both

@@ -339,7 +339,8 @@ class VisualCanvas(Model):
                                                 f"another artist {blank_cell.artist}"))
         raise VisualCell.DoesNotExist(_(f"No available cells in {self} found"))
 
-    def assign_cell(self, artist: Type[AUTH_USER_MODEL], *args, **kwargs):
+    def get_or_assign_cell(self, artist: Type[AUTH_USER_MODEL], *args,
+                           **kwargs):
         """Either create or assign a cell for passed artist if possible."""
         try:
             cell = self.visual_cells.get(artist=artist, *args, **kwargs)

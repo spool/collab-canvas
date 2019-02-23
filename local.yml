@@ -1,4 +1,4 @@
-version: '3'
+version: '3.7'
 
 volumes:
   local_postgres_data: {}
@@ -20,6 +20,8 @@ services:
       - ./.envs/.local/.postgres
     ports:
       - "8000:8000"
+    links:
+      - chrome
     command: /start
 
   postgres:
@@ -68,32 +70,65 @@ services:
       - "5555:5555"
     command: /start-flower
 
-  selenium-hub:
-    image: selenium/hub:3.141.59-gold
-    container_name: selenium-hub
+  hub:
+    image: elgalu/selenium
     ports:
-      - "4444:4444"
+      - 4444:4444
+    volumes:
+      - /dev/shm:/dev/shm
+    privileged: true
+    environment:
+      - SELENIUM_HUB_HOST=hub
+      - SELENIUM_HUB_PORT=4444
+      - GRID=true
+      - CHROME=false
+      - FIREFOX=false
 
   chrome:
-    image: selenium/node-chrome:3.141.59-gold
+    image: elgalu/selenium
+    depends_on:
+      - hub
     ports:
-      - "5900:5900"
+      # VNC: See what's going on by connecting your VNC client to 0.0.0.0:5900
+      - 5900:25900
+      # noVNC: See what's going on by hitting http://0.0.0.0:6080 in your browser
+      #        Important: http://127.0.0.1:6080 works but http://localhost:6080 doesn't
+      - 6080:26080
     volumes:
       - /dev/shm:/dev/shm
-    depends_on:
-      - selenium-hub
+    privileged: true
     environment:
-      - HUB_HOST=selenium-hub
-      - HUB_PORT=4444
+      - NOVNC=true
+      - SELENIUM_HUB_HOST=hub
+      - SELENIUM_HUB_PORT=4444
+      - SELENIUM_NODE_HOST={{CONTAINER_IP}}
+      - SCREEN_WIDTH=1300
+      - SCREEN_HEIGHT=999
+      - VIDEO=false
+      - GRID=false
+      - CHROME=true
+      - FIREFOX=false
 
   firefox:
-    image: selenium/node-firefox:3.141.59-gold
+    image: elgalu/selenium
+    depends_on:
+      - hub
     ports:
-      - "5901:5901"
+      # VNC: See what's going on by connecting your VNC client to 0.0.0.0:5901
+      - 5901:25900
+      # noVNC: See what's going on by hitting http://0.0.0.0:6081 in your browser
+      - 6081:26080
     volumes:
       - /dev/shm:/dev/shm
-    depends_on:
-      - selenium-hub
+    privileged: true
     environment:
-      - HUB_HOST=selenium-hub
-      - HUB_PORT=4444
+      - NOVNC=true
+      - SELENIUM_HUB_HOST=hub
+      - SELENIUM_HUB_PORT=4444
+      - SELENIUM_NODE_HOST={{CONTAINER_IP}}
+      - SCREEN_WIDTH=1300
+      - SCREEN_HEIGHT=999
+      - VIDEO=false
+      - GRID=false
+      - CHROME=false
+      - FIREFOX=true

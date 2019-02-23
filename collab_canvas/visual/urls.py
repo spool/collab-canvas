@@ -5,14 +5,14 @@ Basic structure:
 /visual/canvas-uuid/cell-uuid/edits
 /visual/create?
 
-
-
 Todo:
     * Ensure permission applies for each path
 """
 from django.urls import path
-from .views import (VisualCanvasView, VisualCellView, VisualCellEditView,
-                    VisualCellEditHistoryView)
+
+from .views import (VisualCanvasView, VisualCellView, VisualCellValidEditView,
+                    VisualCellEditHistoryView, VisualCellEditView,
+                    VisualCellEditSuccessView)
 
 
 app_name = "visual"  # Required for naming urls
@@ -31,9 +31,15 @@ urlpatterns = [
     path("canvas/cell/<uuid:cell_id>/", VisualCellView.as_view(), name="cell"),
     # the rest only for managers
     path("canvas/cell/<uuid:cell_id>/<int:edit_number>/",
-         VisualCellEditView.as_view(),
-         name="cell-edit"),
+         VisualCellValidEditView.as_view(),
+         name="cell-valid-edit"),
     path("canvas/cell/<uuid:cell_id>/history/<int:cell_history>/",
          VisualCellEditHistoryView.as_view(),
          name="cell-history"),
+    path("canvas/cell/<uuid:cell_id>/edit/",
+         VisualCellEditView.as_view(),
+         name="cell-edit"),
+    path("canvas/cell/<uuid:cell_id>/edit/success/",
+         VisualCellEditSuccessView.as_view(),
+         name="cell-edit-success"),
 ]

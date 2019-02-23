@@ -34,7 +34,7 @@ TEST_CELL_SOUTH_WEST = TEST_CELL_SOUTH_WEST_DIAGONAL
 TEST_USER_PASSWORD = 'secret'
 
 
-class SuperUser(DjangoModelFactory):
+class SuperUserFactory(DjangoModelFactory):
 
     """
     Inherits from UserFactory to add Superuser privilages.
@@ -48,8 +48,8 @@ class SuperUser(DjangoModelFactory):
 
         model = AUTH_USER_MODEL
 
-    name = 'Test Super User'
-    username = 'test_super'
+    username = Sequence(lambda i: f'test_super_{i}')
+    name = Sequence(lambda i: f'Test Super User {i}')
     password = PostGenerationMethodCall('set_password',
                                         TEST_USER_PASSWORD)
     email = 'super@test.com'
@@ -90,7 +90,7 @@ class CanvasFactory(DjangoModelFactory):
     grid_width = TEST_GRID_WIDTH
     cell_height = TEST_CELL_HEIGHT
     cell_width = TEST_CELL_WIDTH
-    creator = SubFactory(SuperUser)
+    creator = SubFactory(SuperUserFactory)
     new_cells_allowed = False
     is_torus = False
 

@@ -77,9 +77,9 @@ canvas/<canvas_id>/<cell_id>/ view cell (similar to permission above)
 from django.contrib.auth.mixins import UserPassesTestMixin
 # from django.utils.decorators import method_decorator
 from django.http import Http404
-from django.views.generic import DetailView  # BaseView, RedirectView
-# from django.views.generic.edit import CreateView, DetailView  # BaseView, RedirectView
-# from django.shortcuts import get_object_or_404
+from django.views.generic import CreateView, DetailView, TemplateView
+# BaseView, RedirectView
+from django.shortcuts import get_object_or_404, redirect, reverse
 # from django.shortcuts import render
 
 from .models import VisualCanvas, VisualCell, VisualCellEdit
@@ -104,6 +104,15 @@ class VisualCanvasView(UserPassesTestMixin, DetailView):
         user = self.request.user
         return user.is_superuser or user == self.get_object().creator
 
+    def dispatch(self, request, *args, **kwargs):
+        user_test_result = self.get_test_func()()
+        if not user_test_result:
+            if request.user.is_authenticated:
+                cell = self.get_object().get_or_assign_cell(request.user)
+                return redirect('visual:cell-edit', cell_id=cell.id)
+            else:
+                return self.handle_no_permission()
+        return super().dispatch(request, *args, **kwargs)
     # def get_object(self):
     #     """Return canvas specified or 404."""
     #     return get_object_or_404(VisualCanvas, id=self.kwargs['canvas_id'])
@@ -121,11 +130,30 @@ class VisualCellView(UserPassesTestMixin, DetailView):
                                  'the cell artist may view this cell')
     pk_url_kwarg = 'cell_id'
 
+    def dispatch(self, request, *args, **kwargs):
+        """Show cell or forward if not passing test_func."""
+        user_test_result = self.get_test_func()()
+        if not user_test_result:
+            if request.user.is_authenticated:
+                cell = self.get_object()
+                if request.user == cell.artist:
+                    # Force cell artist to only edit cell, not view
+                    return redirect('visual:cell-edit', cell_id=cell.id)
+                else:
+                    # Get or assign cell if artist is not the owner
+                    cell = cell.canvas.get_or_assign_cell(request.user)
+                    return redirect('visual:cell-edit', cell_id=cell.id)
+            else:
+                return self.handle_no_permission()
+        return super().dispatch(request, *args, **kwargs)
+
     def test_func(self):
         """Check if user has access to viewing the canvas."""
         user = self.request.user
-        return (user.is_superuser or user == self.get_object().artist or
-                user == self.get_object().canvas.creator)
+        if user.is_authenticated:
+            return (user.is_superuser or
+                    user == self.get_object().canvas.creator)
+        return False
 
 
 class VisualCellEditHistoryView(UserPassesTestMixin, DetailView):
@@ -143,7 +171,7 @@ class VisualCellEditHistoryView(UserPassesTestMixin, DetailView):
         return self.request.user.is_superuser
 
     def get_queryset(self):
-        queryset = super(VisualCellEditHistoryView, self).get_queryset()
+        queryset = super().get_queryset()
         return queryset.filter(cell__pk=self.kwargs.get('cell_id'))
 
     def get_object(self, queryset=None):
@@ -155,7 +183,7 @@ class VisualCellEditHistoryView(UserPassesTestMixin, DetailView):
         raise Http404()
 
 
-class VisualCellEditView(VisualCellEditHistoryView):
+class VisualCellValidEditView(VisualCellEditHistoryView):
 
     """View a saved is_valid edit of an assigned cell."""
 
@@ -166,3 +194,111 @@ class VisualCellEditView(VisualCellEditHistoryView):
             if cell_edit.edit_number is self.kwargs.get('edit_number'):
                 return cell_edit
         raise Http404()
+
+
+class VisualCellEditView(UserPassesTestMixin, CreateView):
+
+    """
+    Core view for collaborative cell editing.
+
+    In its present form, this view is designed to support collaborative edit
+    with adjacent neighbours---east, south, north, west---on the edge. This
+    means that any edit of edge must also be applied to neighbours. The goal is
+    for this to sufficiently work with Django Channels and websockets, but a
+    fallback may be needed.
+    """
+
+    template_name = 'visual/visual_cell.html'
+    model = VisualCellEdit
+
+    permission_denied_message = ('only administators, the canvas creator and '
+                                 'cell owner can edit a cell')
+    context_object_name = 'visual_cell_edit'
+    fields = VisualCellEdit.get_edge_names()
+
+    # def _get_latest_cell_edit(self, pk_url_kwarg='cell_id'):
+    #     """Return parent cell."""
+    #     cell =
+    #     return cell.latest_valid_edit
+
+    def _get_cell(self, pk_url_kwarg: str = 'cell_id'):
+        """Query for parent cell."""
+        self.cell = get_object_or_404(VisualCell,
+                                      pk=self.kwargs.get(pk_url_kwarg))
+
+    def _get_latest_cell_edit(self):
+        """Query for latest_valid_edit."""
+        if not hasattr(self, 'cell'):
+            self._get_cell()
+        self.latest_edit = self.cell.latest_valid_edit
+
+    def test_func(self):
+        """Check if user has access to edit the cell."""
+        user = self.request.user
+        if user.is_authenticated:
+            return (user.is_superuser or
+                    user == self.get_object().artist or
+                    user == self.get_object().canvas.creator)
+        return False
+
+    def get_initial(self):
+        """Add last most recent cell_edit data as starting point."""
+        initial = super().get_initial()
+        self._get_latest_cell_edit()
+        for field in self.fields:
+            initial[field] = getattr(self.latest_edit, field)
+        return initial
+
+    def form_valid(self, form):
+        """Add artist and cell to form for validation."""
+        form.instance.artist = self.request.user
+        if not hasattr(self, 'cell'):
+            self._get_cell()
+        form.instance.cell = self.cell
+        return super().form_valid(form)
+
+        # self._get_latest_cell_edit(pk_url_kwarg='cell_id')
+
+    def dispatch(self, request, *args, **kwargs):
+        """Show cell or forward if not passing test_func."""
+        user_test_result = self.get_test_func()()
+        if not user_test_result:
+            if request.user.is_authenticated:
+                # Todo: Check this for efficiency
+                if not hasattr(self, 'cell'):
+                    self._get_cell()
+                cell = self.cell.canvas.get_or_assign_cell(request.user)
+                redirect('visual:cell-edit', cell_id=cell.id)
+            else:
+                return self.handle_no_permission()
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_object(self, queryset=None):
+        if queryset is None:
+            queryset = self.get_queryset()
+        if not hasattr(self, 'latest_edit'):
+            self._get_latest_cell_edit()
+        new_cell_edit = self.latest_edit
+        new_cell_edit.id = None
+    #     # Needed because case admin or canvas creators may need to edit
+        new_cell_edit.artist = self.request.user
+        return new_cell_edit
+
+    # def get_object(self, queryset=None):
+    #     cell = get_object_or_404(VisualCell, pk=self.kwargs.get('cell_id'))
+    #     new_cell_edit = cell.latest_valid_edit
+    #     new_cell_edit.id = None
+    #     new_cell_edit.artist = self.request.user
+    #     return new_cell_edit
+
+    def get_success_url(self):
+        """Return successful url redirect."""
+        return reverse('visual:cell-edit-success',
+                       kwargs={'cell_id': self.object.cell.id})
+
+
+class VisualCellEditSuccessView(TemplateView):
+
+    """Confirm cell edit success."""
+
+    template_name = 'visual/visual_cell.html'

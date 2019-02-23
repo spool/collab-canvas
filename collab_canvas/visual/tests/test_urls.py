@@ -38,7 +38,7 @@ class TestDynamicURLs(BaseDynamicCanvasTest):
         self.assertEqual(cell_edit.get_absolute_url(),
                          f'/visual/canvas/cell/{cell_edit.cell.id}/history/1/')
         self.assertEqual(
-            reverse('visual:cell-edit',
+            reverse('visual:cell-valid-edit',
                     kwargs={'cell_id': cell_edit.cell.id,
                             'edit_number': 1}),
             (f'/visual/canvas/cell/{cell_edit.cell.id}/'
@@ -46,7 +46,7 @@ class TestDynamicURLs(BaseDynamicCanvasTest):
         self.assertEqual(
             resolve(f'/visual/canvas/cell/{cell_edit.cell.id}/'
                     f'{cell_edit.history_number}/').view_name,
-            'visual:cell-edit')
+            'visual:cell-valid-edit')
 
     def test_cell_continuous_creation(self):
         """
@@ -77,13 +77,13 @@ class TestDynamicURLs(BaseDynamicCanvasTest):
                 self.assertEqual(edit.get_absolute_url(),
                                  f'/visual/canvas/cell/{cell.id}/history/{i}/')
                 self.assertEqual(
-                    reverse('visual:cell-edit', kwargs={'cell_id': cell.id,
-                                                        'edit_number': i}),
+                    reverse('visual:cell-valid-edit',
+                            kwargs={'cell_id': cell.id, 'edit_number': i}),
                     (f'/visual/canvas/cell/{cell.id}/{edit.history_number}/'))
                 self.assertEqual(
                     resolve('/visual/canvas/cell/'
                             f'{cell.id}/{edit.history_number}/').view_name,
-                    'visual:cell-edit')
+                    'visual:cell-valid-edit')
 
     # def test_cell_history_urls(self):
     #     """Test history consistency even if some edits aren't valid."""

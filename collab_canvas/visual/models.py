@@ -690,6 +690,10 @@ class VisualCell(Model):
         """Canvas url and uuid to retain anonymity in cell position."""
         return reverse('visual:cell', kwargs={'cell_id': self.id})
 
+    def get_edit_url(self):
+        """Return edit url."""
+        return reverse('visual:cell-edit', kwargs={'cell_id': self.id})
+
     def __str__(self):
         return (
             f'({self.x_position}, {self.y_position}) '
@@ -794,9 +798,9 @@ class VisualCellEdit(Model):
         Artist (if specified) and timestamp
 
         Todo:
-            * Fix this!
+            * Improve this to reflect cell assignment and artist differences.
         """
-        state = f'{self.cell.artist} ' if self.cell.artist else 'Empty '
+        state = f'{self.artist} ' if self.artist else 'Empty '
         return state + f'{self.timestamp}'
 
     def get_absolute_url(self):

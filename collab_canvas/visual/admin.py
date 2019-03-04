@@ -1,8 +1,9 @@
 from django.contrib.admin import ModelAdmin
 from .models import VisualCanvas
 
+
 # Register your models here.
-class VisualCanvas(ModelAdmin):
+class VisualCanvasAdmin(ModelAdmin):
 
     """Admin for creating and managing VisualCanvas runs."""
 

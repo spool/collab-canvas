@@ -1,4 +1,4 @@
-pip==19.0.2  # https://github.com/pypa/pip/
+pip==19.0.3  # https://github.com/pypa/pip/
 pytz==2018.9  # https://github.com/stub42/pytz
 python-slugify==2.0.1  # https://github.com/un33k/python-slugify
 Pillow==5.4.1  # https://github.com/python-pillow/Pillow
@@ -6,7 +6,9 @@ rcssmin==1.0.6  # https://github.com/ndparker/rcssmin
 argon2-cffi==19.1.0  # https://github.com/hynek/argon2_cffi
 whitenoise==4.1.2  # https://github.com/evansd/whitenoise
 redis>=2.10.6  # https://github.com/antirez/redis
-celery==4.2.1  # pyup: <5.0  # https://github.com/celery/celery
+# celery==4.2.1  # pyup: <5.0  # https://github.com/celery/celery
+tornado<6  # Celery 4.3.0rc1 currently installs a later incompatible version
+https://github.com/celery/celery/archive/v4.3.0rc1.zip # celery release candidate
 flower==0.9.2  # https://github.com/mher/flower
 
 # Django

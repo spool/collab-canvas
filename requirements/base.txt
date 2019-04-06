@@ -6,9 +6,8 @@ rcssmin==1.0.6  # https://github.com/ndparker/rcssmin
 argon2-cffi==19.1.0  # https://github.com/hynek/argon2_cffi
 whitenoise==4.1.2  # https://github.com/evansd/whitenoise
 redis>=2.10.6  # https://github.com/antirez/redis
-# celery==4.2.1  # pyup: <5.0  # https://github.com/celery/celery
-tornado<6  # Celery 4.3.0rc1 currently installs a later incompatible version
-https://github.com/celery/celery/archive/v4.3.0rc3.zip # celery release candidate
+celery==4.3.0  # pyup: <5.0  # https://github.com/celery/celery
+tornado<6  # Celery 4.3.0 currently installs a later incompatible version
 flower==0.9.2  # https://github.com/mher/flower
 
 # Django

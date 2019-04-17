@@ -1,4 +1,4 @@
-FROM mdillon/postgis:10
+FROM mdillon/postgis:11-alpine
 # FROM postgres:11
 
 # Postgis capabilities
@@ -19,7 +19,9 @@ FROM mdillon/postgis:10
 # COPY ./initdb-postgis.sh /docker-entrypoint-initdb.d/postgis.sh
 # COPY ./update-postgis.sh /usr/local/bin
 
-#End of copied postgis components
+# End of copied postgis components
+
+# See https://hub.docker.com/r/mdillon/postgis/tags
 
 
 COPY ./compose/production/postgres/maintenance /usr/local/bin/maintenance

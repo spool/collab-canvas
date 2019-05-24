@@ -32,12 +32,14 @@ DEFAULT_SQUARE_CELL_DIAGONAL_SIZE = DEFAULT_SQUARE_CELL_SIZE*2
 
 
 DEFAULT_GRID_PARANTHETICAL = (
-    "defaults to an {DEFAULT_SQUARE_GRID_SIZE}x{DEFAULT_SQUARE_GRID_SIZE} grid"
+    "defaults to an "
+    f"{DEFAULT_SQUARE_GRID_SIZE}x{DEFAULT_SQUARE_GRID_SIZE} grid"
 )
 
 
 DEFAULT_CELL_PARANTHETICAL = (
-    "defaults to an {DEFAULT_SQUARE_CELL_SIZE}x{DEFAULT_SQUARE_CELL_SIZE} cell"
+    "defaults to an "
+    f"{DEFAULT_SQUARE_CELL_SIZE}x{DEFAULT_SQUARE_CELL_SIZE} cell"
 )
 
 
@@ -68,19 +70,19 @@ class VisualCanvas(Model):
     end_time = DateTimeField(_("Time the Canvas Will Stop Accepting Edits"))
     grid_width = PositiveSmallIntegerField(
         _("Grid horizontal (x) length, where max number of cells is this "
-          f"times grid_height (DEFAULT_GRID_PARANTHETICAL)"),
+          f"times grid_height ({DEFAULT_GRID_PARANTHETICAL})"),
         default=DEFAULT_SQUARE_GRID_SIZE,)  # Default assumes a square grid
     grid_height = PositiveSmallIntegerField(
         _("Grid vertical (y) length, where max number of cells is this "
-          f"time grid_width (DEFAULT_GRID_PARANTHETICAL)"),
+          f"times grid_width ({DEFAULT_GRID_PARANTHETICAL})"),
         default=DEFAULT_SQUARE_GRID_SIZE,)  # Default assumes a square grid
     # cell_divisions = PositiveSmallIntegerField(_("Cell Divisions"), default=8)
     # There's a possibilty for a 3rd dimension in future if helpful
     cell_width = PositiveSmallIntegerField(_("Width of cell grid "
-                                             f"(DEFAULT_CELL_PARANTHETICAL)"),
+                                             f"({DEFAULT_CELL_PARANTHETICAL})"),
                                            default=DEFAULT_SQUARE_CELL_SIZE)
     cell_height = PositiveSmallIntegerField(_("Height of cell grid "
-                                              "(DEFAULT_CELL_PARANTHETICAL)"),
+                                              f"({DEFAULT_CELL_PARANTHETICAL})"),
                                             default=DEFAULT_SQUARE_CELL_SIZE)
     # cell_type = PositiveSmallIntegerField("Diagonal")
     cell_colour_range = PositiveSmallIntegerField(
@@ -95,6 +97,9 @@ class VisualCanvas(Model):
 
     def __str__(self):
         return f'{self.title} ends {self.end_time:%Y-%m-%d %H:%M}'
+
+    class Meta:
+        verbose_name_plural = "visual canvases"
 
     @property
     def is_grid(self):

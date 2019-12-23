@@ -1,14 +1,18 @@
 /* Project specific Javascript goes here. */
 
+/* Consider trying ES6  */
+
 console.log(window.location)
 
+const channelsWebSocketPath = ''
 const loc = window.location
-const wsProtocol = 'ws://'
+const wsStart = 'ws://'
 if (loc.protocol == 'https:'){
-  wsProtocol = 'wss://'
+  wsStart = 'wss://'
 }
 
-const endpoint = wsProtocol + window.location.host + window.location.pathname
+/*const endpoint = wsStart + loc.host + loc.pathname + 'channels'*/
+const endpoint = wsStart + loc.host + loc.pathname + 'channels'
 
 const socket = new WebSocket(endpoint)
 

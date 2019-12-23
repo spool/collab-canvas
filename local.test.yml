@@ -2,11 +2,19 @@ version: '3.7'
 
 services:
   django: &django
+  # container_name: django_test
     links:
       - chrome
+      - hub
+        # environment:
+        # https://docs.djangoproject.com/en/2.2/releases/1.11/
+        #   - DJANGO_LIVE_TEST_SERVER_ADDRESS=0.0.0.0:8000
+    ports:
+      - 1000:6000
+      - 8000:8001
 
   hub:
-    image: elgalu/selenium
+    image: elgalu/selenium:latest
     ports:
       - 4444:4444
     volumes:
@@ -20,7 +28,7 @@ services:
       - FIREFOX=false
 
   chrome:
-    image: elgalu/selenium
+    image: elgalu/selenium:latest
     depends_on:
       - hub
     ports:
@@ -45,7 +53,7 @@ services:
       - FIREFOX=false
 
   firefox:
-    image: elgalu/selenium
+    image: elgalu/selenium:latest
     depends_on:
       - hub
     ports:

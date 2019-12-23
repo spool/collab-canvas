@@ -10,7 +10,7 @@ Todo:
     * Rearrange default blank and random cells as cell methods
 """
 from random import shuffle, choice
-from typing import Dict, Tuple, Type
+from typing import Dict, Tuple 
 from uuid import uuid4
 
 from django.contrib.postgres.fields import ArrayField
@@ -344,7 +344,7 @@ class VisualCanvas(Model):
                                                 f"another artist {blank_cell.artist}"))
         raise VisualCell.DoesNotExist(_(f"No available cells in {self} found"))
 
-    def get_or_assign_cell(self, artist: Type[AUTH_USER_MODEL], *args,
+    def get_or_assign_cell(self, artist: AUTH_USER_MODEL, *args,
                            **kwargs):
         """Either create or assign a cell for passed artist if possible."""
         try:

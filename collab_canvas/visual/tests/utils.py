@@ -97,7 +97,14 @@ class CanvasFactory(DjangoModelFactory):
 
 class CellFactory(DjangoModelFactory):
 
-    """Base Cell for (0, 0) to work with dynamic, grid and torus canvases."""
+    """
+    Base Cell for (0, 0) to work with dynamic, grid and torus canvases.
+
+    Note:
+        * Cells default to (0, 0) coordinates
+        * To generate neighbours specify coordinates or call
+        canvas.get_or_create_contiguous_cell
+    """
 
     class Meta:
 

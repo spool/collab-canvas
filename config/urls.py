@@ -35,7 +35,7 @@ if settings.DEBUG:
         # For testing p5js UI
         path(
             "test_canvas/",
-            TemplateView.as_view(template_name="pages/visual_canvas.html"),
+            TemplateView.as_view(template_name="visual/visual_cell.html"),
             name="test_visual_canvas",
         ),
         path(

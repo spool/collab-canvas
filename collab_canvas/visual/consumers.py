@@ -9,6 +9,13 @@ class VisualCellEditConsumer(AsyncConsumer):
     async def connect(self, event):
         """Manage connecting cell neighbours."""
         print('connected', event)
+        await self.send({
+            "type": "websocket.accept"
+        })
+        await self.send({
+            "type": "websocket.send",
+            "text": "Hello world"
+        })
 
     async def recieve(self, event):
         """Manage messages sent to cell neighbours."""
